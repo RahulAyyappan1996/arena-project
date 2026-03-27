@@ -1,0 +1,194 @@
+@import "tailwindcss";
+
+@plugin "tailwindcss-animate";
+
+@custom-variant dark (&:is(.dark *));
+
+/* Custom Scrollbar */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+/* Glassmorphism Utilities */
+.glass {
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.glass-dark {
+  background: rgba(0, 0, 0, 0.3);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Red Theme Gradients */
+.gradient-red {
+  background: linear-gradient(135deg, #DC2626 0%, #B91C1C 100%);
+}
+
+.gradient-red-soft {
+  background: linear-gradient(135deg, #FEE2E2 0%, #FECACA 100%);
+}
+
+/* Spring Animation Helpers */
+@keyframes spring {
+  0% { transform: scale(0.8); opacity: 0; }
+  50% { transform: scale(1.05); }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.animate-spring {
+  animation: spring 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+/* Custom Focus Ring */
+.focus-ring:focus {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.3);
+}
+
+/* Status Ring Animations */
+@keyframes pulse-ring {
+  0% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.4); }
+  70% { box-shadow: 0 0 0 10px rgba(220, 38, 38, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0); }
+}
+
+.animate-pulse-ring {
+  animation: pulse-ring 2s infinite;
+}
+
+/* Card Hover Effects */
+.card-hover {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.card-hover:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 20px 40px -15px rgba(220, 38, 38, 0.15);
+}
+
+/* Query Thread Styling */
+.query-thread {
+  position: relative;
+}
+
+.query-thread::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: linear-gradient(to bottom, #DC2626, #FCA5A5);
+  border-radius: 3px;
+}
+
+/* Activity Feed Card */
+.activity-card {
+  transition: all 0.3s ease;
+}
+
+.activity-card:hover {
+  border-color: rgba(220, 38, 38, 0.2);
+}
+
+/* Site Ring Status Colors */
+.site-ring-clean {
+  --tw-ring-color: #10B981;
+}
+
+.site-ring-warning {
+  --tw-ring-color: #F59E0B;
+}
+
+.site-ring-critical {
+  --tw-ring-color: #DC2626;
+}
+
+/* Button Click States */
+.btn-click {
+  transition: transform 0.1s ease, box-shadow 0.2s ease;
+}
+
+.btn-click:active {
+  transform: scale(0.95);
+}
+
+/* Input Focus States */
+input:focus, textarea:focus {
+  transition: all 0.2s ease;
+}
+
+/* Smooth Scrolling */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Custom Selection */
+::selection {
+  background: rgba(220, 38, 38, 0.2);
+  color: #7F1D1D;
+}
+
+/* Loading Animation */
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.animate-shimmer {
+  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+}
+
+/* God Mode Switcher Glow */
+.god-mode-glow {
+  box-shadow: 0 0 20px rgba(220, 38, 38, 0.4), 0 0 40px rgba(220, 38, 38, 0.2);
+}
+
+/* Role Badge Styles */
+.role-badge {
+  transition: all 0.2s ease;
+}
+
+.role-badge:hover {
+  transform: scale(1.05);
+}
+
+/* Stats Card Animation */
+.stats-card {
+  transition: all 0.3s ease;
+}
+
+.stats-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 25px 50px -12px rgba(220, 38, 38, 0.1);
+}
+
+/* Timeline Connector */
+.timeline-connector {
+  position: relative;
+}
+
+.timeline-connector::after {
+  content: '';
+  position: absolute;
+  left: 7px;
+  top: 24px;
+  bottom: -16px;
+  width: 2px;
+  background: #E5E7EB;
+}
+
+.timeline-connector:last-child::after {
+  display: none;
+}
