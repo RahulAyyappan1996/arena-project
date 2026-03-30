@@ -1,0 +1,95 @@
+{
+  "simulation_metadata": {
+    "trial_id": "FARO-PH2-001",
+    "phase": "IIb",
+    "therapeutic_area": "Oncology",
+    "seed_protocol_summary": "Efficacy of FARO-X in Stage III NSCLC with daily oral dosing.",
+    "active_agents_count": 154
+  },
+  "knowledge_graph": {
+    "nodes": [
+      {
+        "id": "P-101",
+        "type": "Patient",
+        "label": "Elena R.",
+        "persona": "High Adherence, Rural Access",
+        "risk_level": "Medium"
+      },
+      {
+        "id": "P-102",
+        "type": "Patient",
+        "label": "Marcus T.",
+        "persona": "Low Adherence, Urban Proximity",
+        "risk_level": "High"
+      },
+      {
+        "id": "SITE-01",
+        "type": "ClinicalSite",
+        "label": "Northview Oncology",
+        "capacity": 0.85
+      },
+      {
+        "id": "DRUG-X",
+        "type": "Intervention",
+        "label": "FARO-X 50mg",
+        "dosage_form": "Tablet"
+      }
+    ],
+    "edges": [
+      {
+        "source": "P-101",
+        "target": "SITE-01",
+        "relation": "ENROLLED_AT",
+        "strength": 0.9
+      },
+      {
+        "source": "P-102",
+        "target": "SITE-01",
+        "relation": "ENROLLED_AT",
+        "strength": 0.4
+      },
+      {
+        "source": "SITE-01",
+        "target": "DRUG-X",
+        "relation": "DISPENSING",
+        "status": "Active"
+      }
+    ]
+  },
+  "agent_swarm": [
+    {
+      "id": "A-01",
+      "role": "Patient-Agent",
+      "name": "Elena R.",
+      "narrative": "Elena is motivated but struggles with the 2-hour drive to Northview. If the visit frequency increases, her dropout probability spikes by 40%.",
+      "current_sentiment": "Committed",
+      "memory_log": [
+        "Visit 1: Completed without issue.",
+        "System Note: Reported mild fatigue after Dose 3."
+      ]
+    },
+    {
+      "id": "A-02",
+      "role": "CRA-Lead",
+      "name": "Sarah Miller",
+      "narrative": "Sarah manages Site-01. She is currently overseeing 4 other trials. Her responsiveness to 'Red Flags' is delayed by 48 hours due to workload.",
+      "current_sentiment": "Overburdened",
+      "memory_log": [
+        "Observation: Site-01 is behind on EDC entry by 3 days.",
+        "Decision: Prioritizing safety queries over demographic updates."
+      ]
+    }
+  ],
+  "hypothetical_projections": {
+    "baseline": {
+      "success_rate": 0.72,
+      "est_completion": "2026-11-15"
+    },
+    "simulated_shift": {
+      "trigger": "Reduce Dosage by 10%",
+      "projected_success": 0.81,
+      "projected_completion": "2026-09-20",
+      "reasoning": "Lower side effects in Patient-Agents leads to 15% fewer dropouts."
+    }
+  }
+}

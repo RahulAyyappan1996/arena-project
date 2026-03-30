@@ -4,6 +4,7 @@ import {
   ArrowRight,
   BarChart3,
   CheckCircle2,
+  Clock3,
   ChevronDown,
   ClipboardList,
   FileText,
@@ -12,9 +13,12 @@ import {
   LayoutDashboard,
   ListChecks,
   Download,
+  Moon,
   Plus,
   Sparkles,
   Settings,
+  SlidersHorizontal,
+  Sun,
   Table,
   Target,
   Trash2,
@@ -22,11 +26,22 @@ import {
   UserCheck,
   Users,
 } from "lucide-react";
+import FaroPredict from "./components/faro-predict/FaroPredict";
 
 type AppView = "login" | "dashboard" | "faro" | "editchecks" | "tmf" | "phase2";
 type EnvironmentType = "uat" | "production";
 type ProjectStatus = "setup" | "pending" | "live";
 type Phase2Role = "CRA" | "DM" | "PI" | "CRC" | "Sponsor";
+type ThemeMode = "manual" | "custom-time" | "sun-cycle";
+
+type ThemeSettings = {
+  mode: ThemeMode;
+  manualDark: boolean;
+  customStart: string;
+  customEnd: string;
+  sunrise: string;
+  sunset: string;
+};
 
 type Project = {
   id: string;
@@ -635,7 +650,43 @@ function buildStudyDocuments(project: Project | null, crfs: CrfRow[], rules: Edi
   }));
 }
 
+function toMinutes(value: string): number {
+  const [hours, mins] = value.split(":").map((part) => Number(part));
+  if (Number.isNaN(hours) || Number.isNaN(mins)) return 0;
+  return hours * 60 + mins;
+}
+
+function isInsideTimeRange(now: number, start: number, end: number): boolean {
+  if (start === end) return false;
+  if (start < end) return now >= start && now < end;
+  return now >= start || now < end;
+}
+
+function computeNightMode(settings: ThemeSettings, now: Date): boolean {
+  const nowMinutes = now.getHours() * 60 + now.getMinutes();
+
+  if (settings.mode === "manual") {
+    return settings.manualDark;
+  }
+
+  if (settings.mode === "custom-time") {
+    return isInsideTimeRange(nowMinutes, toMinutes(settings.customStart), toMinutes(settings.customEnd));
+  }
+
+  return isInsideTimeRange(nowMinutes, toMinutes(settings.sunset), toMinutes(settings.sunrise));
+}
+
 export default function App() {
+  const [themePanelOpen, setThemePanelOpen] = useState(false);
+  const [themeSettings, setThemeSettings] = useState<ThemeSettings>({
+    mode: "manual",
+    manualDark: false,
+    customStart: "21:00",
+    customEnd: "06:00",
+    sunrise: "06:30",
+    sunset: "18:30",
+  });
+  const [clockTick, setClockTick] = useState(() => Date.now());
   const [view, setView] = useState<AppView>("login");
   const [environment, setEnvironment] = useState<EnvironmentType>("uat");
   const [userEmail, setUserEmail] = useState("user@cleartrial.com");
@@ -650,6 +701,32 @@ export default function App() {
   const [subjectsByProject, setSubjectsByProject] = useState<Record<string, Subject[]>>({});
   const [dataEntriesByProject, setDataEntriesByProject] = useState<Record<string, DataEntryRecord[]>>({});
   const [auditLogsByProject, setAuditLogsByProject] = useState<Record<string, AuditLog[]>>({});
+
+  useEffect(() => {
+    const saved = window.localStorage.getItem("cleartrial-theme-settings");
+    if (!saved) return;
+    try {
+      const parsed = JSON.parse(saved) as ThemeSettings;
+      setThemeSettings((prev) => ({ ...prev, ...parsed }));
+    } catch {
+      // Ignore corrupt local state and continue with defaults.
+    }
+  }, []);
+
+  useEffect(() => {
+    window.localStorage.setItem("cleartrial-theme-settings", JSON.stringify(themeSettings));
+  }, [themeSettings]);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setClockTick(Date.now()), 30000);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  const isDarkMode = useMemo(() => computeNightMode(themeSettings, new Date(clockTick)), [themeSettings, clockTick]);
+
+  useEffect(() => {
+    document.documentElement.classList.toggle("dark", isDarkMode);
+  }, [isDarkMode]);
 
   const currentProjectId = currentProject?.id ?? "";
   const currentProjectDocs = currentProjectId ? tmfDocsByProject[currentProjectId] ?? [] : [];
@@ -911,20 +988,29 @@ export default function App() {
 
   if (!isAuthed || view === "login") {
     return (
-      <LoginView
-        environment={environment}
-        setEnvironment={setEnvironment}
-        onSignIn={(email) => {
-          setUserEmail(email);
-          setIsAuthed(true);
-          setView("dashboard");
-        }}
-      />
+      <>
+        <LoginView
+          environment={environment}
+          setEnvironment={setEnvironment}
+          onSignIn={(email) => {
+            setUserEmail(email);
+            setIsAuthed(true);
+            setView("dashboard");
+          }}
+        />
+        <ThemeScheduler
+          open={themePanelOpen}
+          settings={themeSettings}
+          isDarkMode={isDarkMode}
+          onTogglePanel={() => setThemePanelOpen((prev) => !prev)}
+          onSettingsChange={setThemeSettings}
+        />
+      </>
     );
   }
 
   return (
-    <div className="min-h-screen bg-slate-100 text-slate-900">
+    <div className="min-h-screen bg-slate-100 text-slate-900 transition-colors">
       <header className="border-b border-slate-200 bg-white px-6 py-4">
         <div className="mx-auto flex w-full max-w-7xl items-center justify-between">
           <div>
@@ -1041,6 +1127,143 @@ export default function App() {
           />
         )}
       </main>
+
+      <ThemeScheduler
+        open={themePanelOpen}
+        settings={themeSettings}
+        isDarkMode={isDarkMode}
+        onTogglePanel={() => setThemePanelOpen((prev) => !prev)}
+        onSettingsChange={setThemeSettings}
+      />
+    </div>
+  );
+}
+
+function ThemeScheduler({
+  open,
+  settings,
+  isDarkMode,
+  onTogglePanel,
+  onSettingsChange,
+}: {
+  open: boolean;
+  settings: ThemeSettings;
+  isDarkMode: boolean;
+  onTogglePanel: () => void;
+  onSettingsChange: (value: ThemeSettings | ((prev: ThemeSettings) => ThemeSettings)) => void;
+}) {
+  return (
+    <div className="fixed bottom-5 right-5 z-50 flex flex-col items-end gap-2">
+      <button
+        onClick={onTogglePanel}
+        className="inline-flex items-center gap-2 rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50"
+      >
+        <SlidersHorizontal size={16} />
+        Theme
+        <span className={`rounded-full px-2 py-0.5 text-xs ${isDarkMode ? "bg-slate-900 text-white" : "bg-slate-100 text-slate-700"}`}>
+          {isDarkMode ? "Dark" : "Light"}
+        </span>
+      </button>
+
+      {open && (
+        <div className="w-[340px] rounded-2xl border border-slate-200 bg-white p-4 shadow-xl">
+          <div className="mb-3 flex items-center justify-between">
+            <p className="text-sm font-semibold text-slate-900">Theme Scheduler</p>
+            <button
+              onClick={() =>
+                onSettingsChange((prev) => ({
+                  ...prev,
+                  mode: "manual",
+                  manualDark: !isDarkMode,
+                }))
+              }
+              className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-semibold ${isDarkMode ? "bg-slate-900 text-white" : "bg-slate-100 text-slate-700"}`}
+            >
+              {isDarkMode ? <Moon size={14} /> : <Sun size={14} />}
+              Toggle Now
+            </button>
+          </div>
+
+          <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Mode</label>
+          <select
+            value={settings.mode}
+            onChange={(e) => onSettingsChange((prev) => ({ ...prev, mode: e.target.value as ThemeMode }))}
+            className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
+          >
+            <option value="manual">Manual (On/Off)</option>
+            <option value="custom-time">Custom Time Window</option>
+            <option value="sun-cycle">Sunrise / Sunset</option>
+          </select>
+
+          {settings.mode === "manual" && (
+            <button
+              onClick={() => onSettingsChange((prev) => ({ ...prev, manualDark: !prev.manualDark }))}
+              className={`mt-3 inline-flex w-full items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold ${settings.manualDark ? "bg-slate-900 text-white" : "bg-slate-100 text-slate-800"}`}
+            >
+              {settings.manualDark ? <Moon size={16} /> : <Sun size={16} />}
+              Dark Mode {settings.manualDark ? "On" : "Off"}
+            </button>
+          )}
+
+          {settings.mode === "custom-time" && (
+            <div className="mt-3 grid grid-cols-2 gap-2">
+              <label className="text-xs font-medium text-slate-600">
+                <span className="mb-1 block">Start</span>
+                <input
+                  type="time"
+                  value={settings.customStart}
+                  onChange={(e) => onSettingsChange((prev) => ({ ...prev, customStart: e.target.value }))}
+                  className="w-full rounded-lg border border-slate-300 bg-white px-2 py-2 text-sm"
+                />
+              </label>
+              <label className="text-xs font-medium text-slate-600">
+                <span className="mb-1 block">End</span>
+                <input
+                  type="time"
+                  value={settings.customEnd}
+                  onChange={(e) => onSettingsChange((prev) => ({ ...prev, customEnd: e.target.value }))}
+                  className="w-full rounded-lg border border-slate-300 bg-white px-2 py-2 text-sm"
+                />
+              </label>
+            </div>
+          )}
+
+          {settings.mode === "sun-cycle" && (
+            <div className="mt-3 grid grid-cols-2 gap-2">
+              <label className="text-xs font-medium text-slate-600">
+                <span className="mb-1 block">Sunrise</span>
+                <input
+                  type="time"
+                  value={settings.sunrise}
+                  onChange={(e) => onSettingsChange((prev) => ({ ...prev, sunrise: e.target.value }))}
+                  className="w-full rounded-lg border border-slate-300 bg-white px-2 py-2 text-sm"
+                />
+              </label>
+              <label className="text-xs font-medium text-slate-600">
+                <span className="mb-1 block">Sunset</span>
+                <input
+                  type="time"
+                  value={settings.sunset}
+                  onChange={(e) => onSettingsChange((prev) => ({ ...prev, sunset: e.target.value }))}
+                  className="w-full rounded-lg border border-slate-300 bg-white px-2 py-2 text-sm"
+                />
+              </label>
+            </div>
+          )}
+
+          <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700">
+            <p className="font-semibold">Current Status</p>
+            <p className="mt-1 inline-flex items-center gap-1">
+              <Clock3 size={12} />
+              {settings.mode === "manual"
+                ? `Manual mode: ${settings.manualDark ? "Dark" : "Light"}`
+                : settings.mode === "custom-time"
+                  ? `Dark window: ${settings.customStart} - ${settings.customEnd}`
+                  : `Sun cycle: dark from ${settings.sunset} to ${settings.sunrise}`}
+            </p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -2008,56 +2231,13 @@ function ActivityConfigurationView({ activityName, onSaveMap }: { activityName: 
 }
 
 function InsightsView() {
-  const bubbles = [
-    { day: "Day -1", time: "1h 49m", size: 68 },
-    { day: "Day 1", time: "47m", size: 52 },
-    { day: "Day 7", time: "21m", size: 38 },
-    { day: "Day 14", time: "27m", size: 42 },
-    { day: "Day 21", time: "26m", size: 40 },
-  ];
-  const bars = [110, 48, 6, 10, 12, 4, 24, 26, 20];
-
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-6">
-      <h2 className="text-3xl font-semibold">Insights</h2>
-      <p className="text-sm text-slate-600">Participant burden visualization.</p>
-
-      <div className="mt-5 grid gap-5 xl:grid-cols-[1fr_220px]">
-        <div>
-          <div className="rounded-xl border border-slate-200 p-4">
-            <p className="mb-3 text-sm font-semibold">Study Journey</p>
-            <div className="flex items-center gap-3 overflow-x-auto py-2">
-              {bubbles.map((b, i) => (
-                <div key={b.day} className="flex items-center gap-3">
-                  <div className="grid place-items-center rounded-full bg-blue-600 text-center text-xs font-semibold text-white" style={{ width: b.size, height: b.size }}>
-                    <span>{b.time}</span>
-                  </div>
-                  <div className="text-xs font-medium text-slate-600">{b.day}</div>
-                  {i < bubbles.length - 1 && <div className="h-0.5 w-7 bg-blue-300" />}
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="mt-4 rounded-xl border border-slate-200 p-4">
-            <p className="mb-3 text-sm font-semibold">Participant Time per Visit</p>
-            <div className="flex h-52 items-end gap-3">
-              {bars.map((v, i) => (
-                <div key={i} className="flex-1 rounded-t bg-rose-300" style={{ height: `${v}%` }} />
-              ))}
-            </div>
-          </div>
-        </div>
-
-        <div className="rounded-xl border border-slate-200 p-4">
-          <p className="text-sm font-semibold">Total Time</p>
-          <div className="mt-4 grid place-items-center">
-            <div className="grid h-36 w-36 place-items-center rounded-full border-[12px] border-rose-300 text-xl font-semibold text-slate-800">
-              3h 53m
-            </div>
-          </div>
-        </div>
+    <div className="space-y-4">
+      <div className="rounded-2xl border border-slate-200 bg-white p-6">
+        <h2 className="text-3xl font-semibold">Insights</h2>
+        <p className="text-sm text-slate-600">Scenario modeling and AI swarm simulation for operational and efficacy tradeoff testing.</p>
       </div>
+      <FaroPredict />
     </div>
   );
 }
