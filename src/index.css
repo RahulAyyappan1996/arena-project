@@ -4,6 +4,25 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* Global Typeface Override */
+html,
+body,
+#root,
+* {
+  font-family: "Times New Roman", Times, serif;
+}
+
+/* App Shell Feel */
+.app-shell {
+  background-image: radial-gradient(circle at 10% 10%, rgba(59, 130, 246, 0.08), transparent 40%),
+    radial-gradient(circle at 90% 0%, rgba(239, 68, 68, 0.06), transparent 35%);
+}
+
+.dark .app-shell {
+  background-image: radial-gradient(circle at 10% 10%, rgba(59, 130, 246, 0.18), transparent 40%),
+    radial-gradient(circle at 90% 0%, rgba(239, 68, 68, 0.12), transparent 35%);
+}
+
 /* Custom Scrollbar */
 .scrollbar-hide {
   -ms-overflow-style: none;
@@ -73,6 +92,14 @@
 .card-hover:hover {
   transform: translateY(-2px);
   box-shadow: 0 20px 40px -15px rgba(220, 38, 38, 0.15);
+}
+
+/* Smoother control interactions */
+button,
+input,
+select,
+textarea {
+  transition: background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease, color 0.2s ease;
 }
 
 /* Query Thread Styling */

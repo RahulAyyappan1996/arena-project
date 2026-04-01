@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, Suspense, createContext, lazy, useContext, useEffect, useMemo, useState } from "react";
 import {
   ArrowLeft,
   ArrowRight,
@@ -26,7 +26,9 @@ import {
   UserCheck,
   Users,
 } from "lucide-react";
-import FaroPredict from "./components/faro-predict/FaroPredict";
+import simulationData from "./components/faro-predict/faro-simulation-data.json";
+const FaroPredict = lazy(() => import("./components/faro-predict/FaroPredict"));
+const QueryManager = lazy(() => import("./components/QueryManager"));
 
 type AppView = "login" | "dashboard" | "faro" | "editchecks" | "tmf" | "phase2";
 type EnvironmentType = "uat" | "production";
@@ -136,6 +138,10 @@ type FaroScreenKey =
   | "population"
   | "study-design"
   | "schedule-of-activities"
+  | "data-hub"
+  | "query-manager"
+  | "operations-monitor"
+  | "study-differences"
   | "activity-configuration"
   | "insights"
   | "compare"
@@ -210,7 +216,57 @@ type ProtocolData = {
   };
 };
 
-const STUDY_DEFINITION_ITEMS: SidebarItem[] = [
+type QueryItem = {
+  id: string;
+  subjectId: string;
+  description: string;
+  status: "open" | "approved";
+};
+
+type ReconcileRow = {
+  id: string;
+  subjectId: string;
+  metric: string;
+  labValue: string;
+  edcValue: string;
+  matched: boolean;
+  status: "pending" | "verified";
+};
+
+type SiteContact = {
+  name: string;
+  email: string;
+};
+
+type SiteDirectoryItem = {
+  id: string;
+  name: string;
+  region: string;
+  country: string;
+  cecTeam: SiteContact[];
+  craTeam: SiteContact[];
+  piTeam: SiteContact[];
+  dmTeam: SiteContact[];
+  sponsorTeam: SiteContact[];
+};
+
+type DataSourceType = "EDC" | "RTSM" | "Labs" | "eCOA" | "Safety";
+
+type DataHubRecord = {
+  id: string;
+  projectId: string;
+  subjectId: string;
+  siteId: string;
+  visit: string;
+  formType: string;
+  fieldLabel: string;
+  value: string;
+  source: DataSourceType;
+  queryStatus: "none" | "open";
+  capturedAt: string;
+};
+
+const DESIGN_HUB_ITEMS: SidebarItem[] = [
   { key: "general-info", label: "General Info", icon: FileText },
   { key: "objectives", label: "Objectives", icon: Target },
   { key: "population", label: "Population", icon: UserCheck },
@@ -219,23 +275,216 @@ const STUDY_DEFINITION_ITEMS: SidebarItem[] = [
   { key: "study-design", label: "Study Design", icon: LayoutDashboard },
 ];
 
+const INTELLIGENCE_HUB_ITEMS: SidebarItem[] = [
+  { key: "insights", label: "Insights & Faro Predict", icon: Sparkles },
+  { key: "study-differences", label: "Study Differences Report", icon: SlidersHorizontal },
+];
+
 const DATA_ITEMS: SidebarItem[] = [
   { key: "activity-configuration", label: "Activity Configuration", icon: Settings },
-  { key: "insights", label: "Insights", icon: BarChart3 },
   { key: "compare", label: "Compare", icon: ListChecks },
 ];
 
 const DAYS = [-1, 1, 7, 14, 21, 28, 56, 70];
 
-const SITE_DIRECTORY = [
-  { id: "001", name: "Site 001", region: "North America", country: "United States" },
-  { id: "002", name: "Site 002", region: "Europe", country: "United Kingdom" },
-  { id: "003", name: "Site 003", region: "Asia Pacific", country: "Japan" },
-  { id: "004", name: "Site 004", region: "Europe", country: "Germany" },
+const SITE_DIRECTORY: SiteDirectoryItem[] = [
+  {
+    id: "001",
+    name: "Site 001",
+    region: "North America",
+    country: "United States",
+    cecTeam: [
+      { name: "Dr. Laura Bennett", email: "cec.laura.bennett@site001.org" },
+      { name: "Dr. James Carter", email: "cec.james.carter@site001.org" },
+    ],
+    craTeam: [
+      { name: "Megan Ross", email: "cra.megan.ross@site001.org" },
+      { name: "Daniel Price", email: "cra.daniel.price@site001.org" },
+    ],
+    piTeam: [
+      { name: "Dr. Emily Stone", email: "pi.emily.stone@site001.org" },
+      { name: "Dr. Ryan Cole", email: "pi.ryan.cole@site001.org" },
+    ],
+    dmTeam: [
+      { name: "Anita Verma", email: "dm.anita.verma@cleartrial.com" },
+      { name: "Noah Kim", email: "dm.noah.kim@cleartrial.com" },
+    ],
+    sponsorTeam: [
+      { name: "Olivia Chen", email: "sponsor.olivia.chen@glucobalance.com" },
+      { name: "Mark Alvarez", email: "sponsor.mark.alvarez@glucobalance.com" },
+    ],
+  },
+  {
+    id: "002",
+    name: "Site 002",
+    region: "Europe",
+    country: "United Kingdom",
+    cecTeam: [
+      { name: "Dr. Amelia Knight", email: "cec.amelia.knight@site002.org" },
+      { name: "Dr. Oliver Hayes", email: "cec.oliver.hayes@site002.org" },
+    ],
+    craTeam: [
+      { name: "Sophie Reed", email: "cra.sophie.reed@site002.org" },
+      { name: "Liam Foster", email: "cra.liam.foster@site002.org" },
+    ],
+    piTeam: [
+      { name: "Dr. Helen Brooks", email: "pi.helen.brooks@site002.org" },
+      { name: "Dr. Peter Lowe", email: "pi.peter.lowe@site002.org" },
+    ],
+    dmTeam: [
+      { name: "Anita Verma", email: "dm.anita.verma@cleartrial.com" },
+      { name: "Noah Kim", email: "dm.noah.kim@cleartrial.com" },
+    ],
+    sponsorTeam: [
+      { name: "Olivia Chen", email: "sponsor.olivia.chen@glucobalance.com" },
+      { name: "Mark Alvarez", email: "sponsor.mark.alvarez@glucobalance.com" },
+    ],
+  },
+  {
+    id: "003",
+    name: "Site 003",
+    region: "Asia Pacific",
+    country: "Japan",
+    cecTeam: [
+      { name: "Dr. Yuki Sato", email: "cec.yuki.sato@site003.org" },
+      { name: "Dr. Kenji Watanabe", email: "cec.kenji.watanabe@site003.org" },
+    ],
+    craTeam: [
+      { name: "Aiko Tanaka", email: "cra.aiko.tanaka@site003.org" },
+      { name: "Ren Ito", email: "cra.ren.ito@site003.org" },
+    ],
+    piTeam: [
+      { name: "Dr. Mei Nakamura", email: "pi.mei.nakamura@site003.org" },
+      { name: "Dr. Takumi Saito", email: "pi.takumi.saito@site003.org" },
+    ],
+    dmTeam: [
+      { name: "Anita Verma", email: "dm.anita.verma@cleartrial.com" },
+      { name: "Noah Kim", email: "dm.noah.kim@cleartrial.com" },
+    ],
+    sponsorTeam: [
+      { name: "Olivia Chen", email: "sponsor.olivia.chen@glucobalance.com" },
+      { name: "Mark Alvarez", email: "sponsor.mark.alvarez@glucobalance.com" },
+    ],
+  },
+  {
+    id: "004",
+    name: "Site 004",
+    region: "Europe",
+    country: "Germany",
+    cecTeam: [
+      { name: "Dr. Hannah Vogel", email: "cec.hannah.vogel@site004.org" },
+      { name: "Dr. Lukas Weber", email: "cec.lukas.weber@site004.org" },
+    ],
+    craTeam: [
+      { name: "Nina Schulz", email: "cra.nina.schulz@site004.org" },
+      { name: "Felix Braun", email: "cra.felix.braun@site004.org" },
+    ],
+    piTeam: [
+      { name: "Dr. Greta Hoffmann", email: "pi.greta.hoffmann@site004.org" },
+      { name: "Dr. Jonas Keller", email: "pi.jonas.keller@site004.org" },
+    ],
+    dmTeam: [
+      { name: "Anita Verma", email: "dm.anita.verma@cleartrial.com" },
+      { name: "Noah Kim", email: "dm.noah.kim@cleartrial.com" },
+    ],
+    sponsorTeam: [
+      { name: "Olivia Chen", email: "sponsor.olivia.chen@glucobalance.com" },
+      { name: "Mark Alvarez", email: "sponsor.mark.alvarez@glucobalance.com" },
+    ],
+  },
 ];
 
 const REGION_OPTIONS = ["North America", "Europe", "Asia Pacific", "Latin America", "Middle East"];
 const COUNTRY_OPTIONS = ["United States", "United Kingdom", "Germany", "Japan", "India", "Canada", "France", "Spain"];
+
+const INITIAL_QUERIES: QueryItem[] = [
+  { id: "q1", subjectId: "001-001", description: "Missing ethnicity on Demographics", status: "open" },
+  { id: "q2", subjectId: "001-002", description: "AE start date conflicts with visit date", status: "open" },
+  { id: "q3", subjectId: "002-001", description: "Lab ALT outlier requires site confirmation", status: "open" },
+  { id: "q4", subjectId: "003-001", description: "ECG time stamp mismatch", status: "open" },
+];
+
+const INITIAL_RECONCILIATION_ROWS: ReconcileRow[] = [
+  { id: "r1", subjectId: "001-001", metric: "Hemoglobin", labValue: "12.8", edcValue: "12.8", matched: true, status: "pending" },
+  { id: "r2", subjectId: "001-001", metric: "ALT", labValue: "48", edcValue: "44", matched: false, status: "pending" },
+  { id: "r3", subjectId: "001-002", metric: "AST", labValue: "31", edcValue: "31", matched: true, status: "pending" },
+  { id: "r4", subjectId: "002-001", metric: "Creatinine", labValue: "1.2", edcValue: "1.1", matched: false, status: "pending" },
+  { id: "r5", subjectId: "003-001", metric: "Platelets", labValue: "198", edcValue: "198", matched: true, status: "pending" },
+];
+
+const MOCK_DATAHUB_EXTERNAL: DataHubRecord[] = [
+  {
+    id: "ext-1",
+    projectId: "all",
+    subjectId: "001-001",
+    siteId: "001",
+    visit: "Day 1",
+    formType: "Randomization",
+    fieldLabel: "Treatment Arm",
+    value: "Arm A",
+    source: "RTSM",
+    queryStatus: "none",
+    capturedAt: "2026-01-10T09:20:00.000Z",
+  },
+  {
+    id: "ext-2",
+    projectId: "all",
+    subjectId: "001-002",
+    siteId: "001",
+    visit: "Day 7",
+    formType: "Laboratory Results",
+    fieldLabel: "ALT",
+    value: "47",
+    source: "Labs",
+    queryStatus: "open",
+    capturedAt: "2026-01-19T14:05:00.000Z",
+  },
+  {
+    id: "ext-3",
+    projectId: "all",
+    subjectId: "002-001",
+    siteId: "002",
+    visit: "Day 14",
+    formType: "PRO Diary",
+    fieldLabel: "Pain Score",
+    value: "4",
+    source: "eCOA",
+    queryStatus: "none",
+    capturedAt: "2026-01-26T07:10:00.000Z",
+  },
+  {
+    id: "ext-4",
+    projectId: "all",
+    subjectId: "003-001",
+    siteId: "003",
+    visit: "Day 21",
+    formType: "Safety Follow-up",
+    fieldLabel: "Serious AE",
+    value: "No",
+    source: "Safety",
+    queryStatus: "none",
+    capturedAt: "2026-02-03T11:40:00.000Z",
+  },
+];
+
+type CommandHubContextType = {
+  readinessScore: number;
+  queries: QueryItem[];
+  openQueriesCount: number;
+  approveQuery: (id: string) => void;
+  reconcileRows: ReconcileRow[];
+  setReconcileRows: React.Dispatch<React.SetStateAction<ReconcileRow[]>>;
+};
+
+const CommandHubContext = createContext<CommandHubContextType | null>(null);
+
+function useCommandHub() {
+  const context = useContext(CommandHubContext);
+  if (!context) {
+    throw new Error("Command hub context is missing");
+  }
+  return context;
+}
 
 const MATRIX: Record<string, Record<number, MatrixCell | null>> = {
   Demographics: { [-1]: { count: 1, phase: "Screening" }, 1: null, 7: null, 14: null, 21: null, 28: null, 56: null, 70: null },
@@ -676,8 +925,129 @@ function computeNightMode(settings: ThemeSettings, now: Date): boolean {
   return isInsideTimeRange(nowMinutes, toMinutes(settings.sunset), toMinutes(settings.sunrise));
 }
 
+function createSeededLiveStudyData(projectId: string, subjectCount = 100) {
+  const subjects: Subject[] = [];
+  const entries: DataEntryRecord[] = [];
+  const auditLogs: AuditLog[] = [];
+  const siteCounters = new Map<string, number>();
+  const completionBands = [1, 7, 14, 21];
+
+  const pickValueByType = (field: CrfFieldTemplate, rowIndex: number, visitDay: number) => {
+    if (field.fieldType === "restricted") {
+      const options = field.allowedValues ?? ["Other"];
+      return options[rowIndex % options.length] ?? "Other";
+    }
+    if (field.fieldType === "date") {
+      const date = new Date(Date.UTC(2026, 0, 1 + Math.max(0, visitDay) + (rowIndex % 28)));
+      return date.toISOString().slice(0, 10);
+    }
+    if (field.fieldType === "time") {
+      const hour = 8 + (rowIndex % 8);
+      const minute = rowIndex % 2 === 0 ? "00" : "30";
+      return `${String(hour).padStart(2, "0")}:${minute}`;
+    }
+    if (field.fieldType === "number") {
+      return String(60 + (rowIndex % 25));
+    }
+    if (field.fieldType === "other") {
+      return `Other note ${rowIndex + 1}`;
+    }
+    return `${field.fieldLabel} value ${rowIndex + 1}`;
+  };
+
+  for (let i = 0; i < subjectCount; i += 1) {
+    const site = SITE_DIRECTORY[i % SITE_DIRECTORY.length];
+    const nextSiteSeq = (siteCounters.get(site.id) ?? 0) + 1;
+    siteCounters.set(site.id, nextSiteSeq);
+
+    const subjectId = `${site.id}-${String(nextSiteSeq).padStart(3, "0")}`;
+    const enrolled = new Date(Date.UTC(2026, 0, 3 + (i % 45)));
+    const dob = new Date(Date.UTC(1970 + (i % 25), i % 12, 1 + (i % 27)));
+
+    subjects.push({
+      id: subjectId,
+      siteId: site.id,
+      region: site.region,
+      country: site.country,
+      dob: dob.toISOString().slice(0, 10),
+      enrolledAt: enrolled.toISOString().slice(0, 10),
+    });
+
+    const highestCompletedDay = completionBands[i % completionBands.length];
+    const hasOpenQuery = i % 6 === 0;
+
+    DAYS.filter((day) => day <= highestCompletedDay).forEach((day) => {
+      const visit = `Day ${day}`;
+      const scheduledCrfs = Object.keys(MATRIX).filter((crfName) => Boolean(MATRIX[crfName]?.[day]));
+
+      scheduledCrfs.forEach((crfName) => {
+        const fields = CRF_FIELD_LIBRARY[crfName] ?? [{ fieldLabel: "Other Field", fieldType: "other" as CrfFieldType }];
+
+        fields.forEach((field, fieldIndex) => {
+          const enteredAt = new Date(Date.UTC(2026, 1, 1 + i + Math.max(0, day), 8 + (fieldIndex % 6), (i * 7 + fieldIndex * 3) % 60));
+          const value = pickValueByType(field, i + fieldIndex, day);
+          const status: DataEntryRecord["status"] = hasOpenQuery && fieldIndex === 0 && day === highestCompletedDay ? "queried" : "submitted";
+          const entryId = `${projectId}-${subjectId}-${day}-${crfName}-${field.fieldLabel}`.replace(/\s+/g, "-");
+
+          entries.push({
+            id: entryId,
+            projectId,
+            subjectId,
+            visit,
+            crf: crfName,
+            fieldLabel: field.fieldLabel,
+            value,
+            enteredBy: `site.${site.id.toLowerCase()}@cleartrial.com`,
+            enteredByRole: i % 2 === 0 ? "CRA" : "CRC",
+            enteredAt: enteredAt.toISOString(),
+            status,
+            reviewNote: status === "queried" ? "Please verify against source notes" : undefined,
+          });
+        });
+      });
+    });
+
+    auditLogs.push({
+      id: `audit-seed-${projectId}-${subjectId}`,
+      projectId,
+      action: `Seeded subject ${subjectId} with chronological visit data`,
+      by: "system.seed@cleartrial.com",
+      timestamp: new Date(Date.UTC(2026, 1, 1, 6, i % 60)).toISOString(),
+    });
+  }
+
+  return { subjects, entries, auditLogs };
+}
+
+function ClearTrialLogo({ onClick, variant = "default" }: { onClick: () => void; variant?: "default" | "stripe" }) {
+  const isStripe = variant === "stripe";
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={
+        isStripe
+          ? "group inline-flex items-center gap-3 rounded-lg border border-white/25 bg-white/10 px-3 py-1.5 text-white backdrop-blur transition hover:bg-white/15"
+          : "group inline-flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-2 py-1.5 transition hover:border-blue-300 hover:bg-blue-50"
+      }
+      aria-label="Go to ClearTrial home"
+      title="Go to home"
+    >
+      <span className={isStripe ? "grid h-10 w-10 place-items-center rounded-lg bg-white/20 shadow-sm" : "grid h-10 w-10 place-items-center rounded-lg bg-gradient-to-br from-blue-600 to-indigo-600 shadow-sm"}>
+        <svg viewBox="0 0 48 48" className="h-6 w-6" aria-hidden="true">
+          <circle cx="24" cy="24" r="18" className={isStripe ? "fill-white/25" : "fill-white/20"} />
+          <path d="M8 24h7l4-8 6 16 5-10h10" className="stroke-white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+        </svg>
+      </span>
+      <span className="text-left">
+        <span className={isStripe ? "block text-sm font-semibold text-white" : "block text-sm font-semibold text-slate-900 group-hover:text-blue-700"}>ClearTrial</span>
+        <span className={isStripe ? "block text-[11px] uppercase tracking-wide text-white/85" : "block text-[11px] uppercase tracking-wide text-slate-500"}>Clinical EDC</span>
+      </span>
+    </button>
+  );
+}
+
 export default function App() {
-  const [themePanelOpen, setThemePanelOpen] = useState(false);
   const [themeSettings, setThemeSettings] = useState<ThemeSettings>({
     mode: "manual",
     manualDark: false,
@@ -733,6 +1103,26 @@ export default function App() {
   const currentSubjects = currentProjectId ? subjectsByProject[currentProjectId] ?? [] : [];
   const currentEntries = currentProjectId ? dataEntriesByProject[currentProjectId] ?? [] : [];
   const currentAuditLogs = currentProjectId ? auditLogsByProject[currentProjectId] ?? [] : [];
+
+  useEffect(() => {
+    // Preload live-study demo data so DM and oversight roles always have subject-level records to review.
+    const liveProjectId = "p-003";
+    const hasSubjects = (subjectsByProject[liveProjectId] ?? []).length > 0;
+    const hasEntries = (dataEntriesByProject[liveProjectId] ?? []).length > 0;
+    if (hasSubjects && hasEntries) return;
+
+    const seeded = createSeededLiveStudyData(liveProjectId, 100);
+    if (!hasSubjects) {
+      setSubjectsByProject((prev) => ({ ...prev, [liveProjectId]: seeded.subjects }));
+    }
+    if (!hasEntries) {
+      setDataEntriesByProject((prev) => ({ ...prev, [liveProjectId]: seeded.entries }));
+    }
+    setAuditLogsByProject((prev) => ({
+      ...prev,
+      [liveProjectId]: [...(prev[liveProjectId] ?? []), ...seeded.auditLogs],
+    }));
+  }, [subjectsByProject, dataEntriesByProject]);
 
   const approvedCount = rules.filter((r) => r.decision === "approved").length;
   const rejectedCount = rules.filter((r) => r.decision === "rejected").length;
@@ -862,8 +1252,11 @@ export default function App() {
     }));
   };
 
-  const allDocs = Object.values(tmfDocsByProject).flat();
-  const myPendingDocs = allDocs.filter((doc) => doc.assignedTo.includes(userEmail) && !doc.signedBy.includes(userEmail));
+  const allDocs = useMemo(() => Object.values(tmfDocsByProject).flat(), [tmfDocsByProject]);
+  const myPendingDocs = useMemo(
+    () => allDocs.filter((doc) => doc.assignedTo.includes(userEmail) && !doc.signedBy.includes(userEmail)),
+    [allDocs, userEmail],
+  );
   const allDocsReadyForGoLive =
     currentProjectDocs.length > 0 &&
     currentProjectDocs.every((doc) => doc.assignedTo.length > 0 && doc.signedBy.length === doc.assignedTo.length);
@@ -988,52 +1381,134 @@ export default function App() {
 
   if (!isAuthed || view === "login") {
     return (
-      <>
-        <LoginView
-          environment={environment}
-          setEnvironment={setEnvironment}
-          onSignIn={(email) => {
-            setUserEmail(email);
-            setIsAuthed(true);
-            setView("dashboard");
-          }}
-        />
-        <ThemeScheduler
-          open={themePanelOpen}
-          settings={themeSettings}
-          isDarkMode={isDarkMode}
-          onTogglePanel={() => setThemePanelOpen((prev) => !prev)}
-          onSettingsChange={setThemeSettings}
-        />
-      </>
+      <LoginView
+        environment={environment}
+        setEnvironment={setEnvironment}
+        isDarkMode={isDarkMode}
+        onToggleDark={() =>
+          setThemeSettings((prev) => ({
+            ...prev,
+            mode: "manual",
+            manualDark: !isDarkMode,
+          }))
+        }
+        onSignIn={(email) => {
+          setUserEmail(email);
+          setIsAuthed(true);
+          setView("dashboard");
+        }}
+      />
     );
   }
 
   return (
-    <div className="min-h-screen bg-slate-100 text-slate-900 transition-colors">
-      <header className="border-b border-slate-200 bg-white px-6 py-4">
-        <div className="mx-auto flex w-full max-w-7xl items-center justify-between">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">ClearTrial Sequential Workflow</p>
-            <h1 className="text-2xl font-semibold">{currentProject?.title ?? "Projects"}</h1>
-            <p className="text-xs text-slate-500">Signed in as {userEmail}</p>
-          </div>
-          <div className="flex items-center gap-3">
-            <button
+    <div className="app-shell min-h-screen bg-slate-100 text-slate-900 transition-colors">
+      <header className="border-b border-slate-200 bg-white">
+        <div className="bg-gradient-to-r from-red-700 via-red-600 to-rose-600 px-6 py-2">
+          <div className="mx-auto flex w-full max-w-7xl items-center justify-between">
+            <ClearTrialLogo
+              variant="stripe"
               onClick={() => {
-                if (!currentProject && projects.length > 0) {
-                  setCurrentProject(projects[0]);
-                }
-                setView("tmf");
+                setView("dashboard");
               }}
-              className="rounded-full border border-slate-300 bg-white px-3 py-1 text-xs font-semibold text-slate-700"
-            >
-              TMF Portal {myPendingDocs.length > 0 ? `(${myPendingDocs.length})` : ""}
-            </button>
-            {envBadge}
+            />
+            <div className="text-xs font-semibold uppercase tracking-wide text-white/90">Clinical Operations Command</div>
+          </div>
+        </div>
+        <div
+          className={`border-y px-6 py-4 ${
+            isDarkMode
+              ? "border-violet-800 bg-gradient-to-r from-violet-950 via-fuchsia-950 to-indigo-950"
+              : "border-violet-200 bg-gradient-to-r from-violet-50 via-fuchsia-50 to-indigo-50"
+          }`}
+        >
+          <div className="mx-auto flex w-full max-w-7xl items-center justify-between">
+            <div>
+              <p className={`text-xs font-semibold uppercase tracking-wide ${isDarkMode ? "text-violet-200" : "text-violet-700"}`}>ClearTrial Sequential Workflow</p>
+              <div className="mt-1 flex flex-wrap items-center gap-2">
+                <h1 className={`text-2xl font-semibold ${isDarkMode ? "text-purple-50" : "text-slate-900"}`}>{currentProject?.title ?? "Projects"}</h1>
+                {view === "phase2" && (
+                  <label
+                    className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold shadow-sm backdrop-blur ${
+                      isDarkMode
+                        ? "border-violet-700 bg-violet-900/45 text-violet-100"
+                        : "border-violet-200 bg-white/85 text-violet-800"
+                    }`}
+                  >
+                    <span>Role</span>
+                    <select
+                      value={phase2Role}
+                      onChange={(e) => setPhase2Role(e.target.value as Phase2Role)}
+                      className={`rounded-full border px-2 py-1 text-xs font-semibold ${
+                        isDarkMode
+                          ? "border-violet-700 bg-violet-950 text-violet-100"
+                          : "border-violet-200 bg-white text-violet-900"
+                      }`}
+                      aria-label="Current role"
+                    >
+                      <option value="CRA">CRA</option>
+                      <option value="CRC">CRC</option>
+                      <option value="PI">PI</option>
+                      <option value="DM">DM</option>
+                      <option value="Sponsor">Sponsor</option>
+                    </select>
+                  </label>
+                )}
+              </div>
+                <p className={`text-xs ${isDarkMode ? "text-violet-200/80" : "text-slate-600"}`}>Signed in as {userEmail}</p>
+            </div>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() =>
+                  setThemeSettings((prev) => ({
+                    ...prev,
+                    mode: "manual",
+                    manualDark: !isDarkMode,
+                  }))
+                }
+                className={`inline-flex items-center justify-center rounded-full border p-2 shadow-sm backdrop-blur ${
+                  isDarkMode
+                    ? "border-violet-700 bg-violet-900/45 text-violet-100 hover:bg-violet-900/65"
+                    : "border-violet-200 bg-white/85 text-violet-800 hover:bg-white"
+                }`}
+                aria-label={isDarkMode ? "Switch to light mode" : "Switch to dark mode"}
+              >
+                {isDarkMode ? <Moon size={14} /> : <Sun size={14} />}
+              </button>
+              <button
+                onClick={() => {
+                  if (!currentProject && projects.length > 0) {
+                    setCurrentProject(projects[0]);
+                  }
+                  setView("tmf");
+                }}
+                className={`rounded-full border px-3 py-1 text-xs font-semibold shadow-sm backdrop-blur ${
+                  isDarkMode
+                    ? "border-violet-700 bg-violet-900/45 text-violet-100 hover:bg-violet-900/65"
+                    : "border-violet-200 bg-white/85 text-violet-800 hover:bg-white"
+                }`}
+              >
+                TMF Portal {myPendingDocs.length > 0 ? `(${myPendingDocs.length})` : ""}
+              </button>
+              {envBadge}
+            </div>
           </div>
         </div>
       </header>
+
+      <div
+        className={`border-b px-6 py-2 ${
+          isDarkMode
+            ? "border-violet-800 bg-gradient-to-r from-violet-950 via-fuchsia-950 to-indigo-950"
+            : "border-violet-200 bg-gradient-to-r from-violet-50 via-fuchsia-50 to-indigo-50"
+        }`}
+      >
+        <div className="mx-auto flex w-full max-w-7xl flex-wrap items-center gap-2 text-xs">
+          <span className={`rounded-full border px-3 py-1 font-semibold ${isDarkMode ? "border-violet-700 bg-violet-900/45 text-violet-100" : "border-violet-200 bg-white/80 text-violet-700"}`}>Build Agent: Idle</span>
+          <span className="rounded-full border border-amber-300 bg-amber-50 px-3 py-1 font-semibold text-amber-700 dark:border-amber-500/50 dark:bg-amber-500/15 dark:text-amber-300">Cleaning Agent: Active (42 queries)</span>
+          <span className={`rounded-full border px-3 py-1 font-semibold ${isDarkMode ? "border-violet-700 bg-violet-900/35 text-violet-200" : "border-fuchsia-200 bg-white/80 text-fuchsia-700"}`}>Simulation Agent: Standby</span>
+        </div>
+      </div>
 
       <main className="mx-auto w-full max-w-7xl p-6">
         {view === "dashboard" && (
@@ -1129,12 +1604,14 @@ export default function App() {
       </main>
 
       <ThemeScheduler
-        open={themePanelOpen}
+        open={false}
         settings={themeSettings}
         isDarkMode={isDarkMode}
-        onTogglePanel={() => setThemePanelOpen((prev) => !prev)}
+        onTogglePanel={() => void 0}
         onSettingsChange={setThemeSettings}
+        showTrigger={false}
       />
+
     </div>
   );
 }
@@ -1145,25 +1622,29 @@ function ThemeScheduler({
   isDarkMode,
   onTogglePanel,
   onSettingsChange,
+  showTrigger = true,
 }: {
   open: boolean;
   settings: ThemeSettings;
   isDarkMode: boolean;
   onTogglePanel: () => void;
   onSettingsChange: (value: ThemeSettings | ((prev: ThemeSettings) => ThemeSettings)) => void;
+  showTrigger?: boolean;
 }) {
   return (
     <div className="fixed bottom-5 right-5 z-50 flex flex-col items-end gap-2">
-      <button
-        onClick={onTogglePanel}
-        className="inline-flex items-center gap-2 rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50"
-      >
-        <SlidersHorizontal size={16} />
-        Theme
-        <span className={`rounded-full px-2 py-0.5 text-xs ${isDarkMode ? "bg-slate-900 text-white" : "bg-slate-100 text-slate-700"}`}>
-          {isDarkMode ? "Dark" : "Light"}
-        </span>
-      </button>
+      {showTrigger && (
+        <button
+          onClick={onTogglePanel}
+          className="inline-flex items-center gap-2 rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50"
+        >
+          <SlidersHorizontal size={16} />
+          Theme
+          <span className={`rounded-full px-2 py-0.5 text-xs ${isDarkMode ? "bg-slate-900 text-white" : "bg-slate-100 text-slate-700"}`}>
+            {isDarkMode ? "Dark" : "Light"}
+          </span>
+        </button>
+      )}
 
       {open && (
         <div className="w-[340px] rounded-2xl border border-slate-200 bg-white p-4 shadow-xl">
@@ -1271,10 +1752,14 @@ function ThemeScheduler({
 function LoginView({
   environment,
   setEnvironment,
+  isDarkMode,
+  onToggleDark,
   onSignIn,
 }: {
   environment: EnvironmentType;
   setEnvironment: (env: EnvironmentType) => void;
+  isDarkMode: boolean;
+  onToggleDark: () => void;
   onSignIn: (email: string) => void;
 }) {
   const [email, setEmail] = useState("user@cleartrial.com");
@@ -1284,7 +1769,16 @@ function LoginView({
   return (
     <div className="flex min-h-screen items-center justify-center bg-slate-100 p-6">
       <div className="w-full max-w-xl rounded-2xl border border-slate-200 bg-white p-7 shadow-sm">
-        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Gateway</p>
+        <div className="flex items-start justify-between gap-3">
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Gateway</p>
+          <button
+            onClick={onToggleDark}
+            className="inline-flex items-center justify-center rounded-full border border-slate-300 bg-white p-2 text-slate-700 transition hover:bg-slate-50"
+            aria-label={isDarkMode ? "Switch to light mode" : "Switch to dark mode"}
+          >
+            {isDarkMode ? <Moon size={14} /> : <Sun size={14} />}
+          </button>
+        </div>
         <h2 className="mt-1 text-3xl font-semibold">ClearTrial Login</h2>
         <p className="mt-2 text-slate-600">Sign in to access the study lifecycle workspace.</p>
 
@@ -1375,9 +1869,6 @@ function DashboardView({
             ? `You have ${pendingSignatures} document${pendingSignatures > 1 ? "s" : ""} waiting for signature.`
             : "No pending signature tasks right now."}
         </p>
-        <button onClick={onOpenTmf} className="mt-2 rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white">
-          Open TMF Landing Page
-        </button>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">
@@ -1531,6 +2022,16 @@ function FaroWorkspace({ onBack, onContinueToEditChecks }: { onBack: () => void;
   const [aiAlignMessage, setAiAlignMessage] = useState<string | null>(null);
   const [menuRow, setMenuRow] = useState<string | null>(null);
   const [tooltip, setTooltip] = useState<{ x: number; y: number; text: string } | null>(null);
+  const [queries, setQueries] = useState<QueryItem[]>(INITIAL_QUERIES);
+  const [readinessScore, setReadinessScore] = useState(68);
+  const [reconcileRows, setReconcileRows] = useState<ReconcileRow[]>(INITIAL_RECONCILIATION_ROWS);
+
+  const openQueriesCount = queries.filter((query) => query.status === "open").length;
+
+  const approveQuery = (id: string) => {
+    setQueries((prev) => prev.map((query) => (query.id === id ? { ...query, status: "approved" } : query)));
+    setReadinessScore((prev) => Math.min(99, prev + 3));
+  };
 
   const crfRows = useMemo(() => {
     const selectedSet = new Set(selectedActivities);
@@ -1661,9 +2162,17 @@ function FaroWorkspace({ onBack, onContinueToEditChecks }: { onBack: () => void;
       case "activity-configuration":
         return <ActivityConfigurationView activityName={selectedActivity} onSaveMap={() => setActiveScreen("crf-manager")} />;
       case "insights":
-        return <InsightsView />;
+        return <TrialSandboxView />;
       case "compare":
         return <CompareView protocol={PROTOCOL_DATA} />;
+      case "data-hub":
+        return <DataHubView />;
+      case "query-manager":
+        return <QueryManagerView />;
+      case "operations-monitor":
+        return <OperationsMonitorView />;
+      case "study-differences":
+        return <StudyDifferencesView />;
       case "crf-manager":
         return (
           <CrfManagerView
@@ -1680,19 +2189,36 @@ function FaroWorkspace({ onBack, onContinueToEditChecks }: { onBack: () => void;
   }, [activeScreen, selectedActivity, selectedActivities, menuRow, tooltip, crfRows]);
 
   return (
-    <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+    <CommandHubContext.Provider
+      value={{
+        readinessScore,
+        queries,
+        openQueriesCount,
+        approveQuery,
+        reconcileRows,
+        setReconcileRows,
+      }}
+    >
+    <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white text-slate-900 shadow-sm">
       <div className="flex min-h-[740px]">
-        <aside className="w-72 border-r border-slate-200 bg-slate-50 p-4">
-          <p className="mb-4 text-sm font-semibold uppercase tracking-wide text-slate-500">faro</p>
+        <aside className="w-80 border-r border-rose-200 bg-rose-50/60 p-4">
+          <p className="mb-4 text-sm font-semibold uppercase tracking-wide text-rose-700">faro command center</p>
 
-          <p className="mb-2 text-xs font-semibold uppercase text-slate-500">Study Definition</p>
+          <p className="mb-2 text-xs font-semibold uppercase text-rose-700">Design Hub (Sections 1-6)</p>
           <div className="space-y-1">
-            {STUDY_DEFINITION_ITEMS.map((item) => (
+            {DESIGN_HUB_ITEMS.map((item) => (
               <SidebarButton key={item.key} item={item} active={activeScreen === item.key} onClick={() => setActiveScreen(item.key)} />
             ))}
           </div>
 
-          <p className="mb-2 mt-5 text-xs font-semibold uppercase text-slate-500">Data</p>
+          <p className="mb-2 mt-5 text-xs font-semibold uppercase text-rose-700">Intelligence Hub (Sections 10-12)</p>
+          <div className="space-y-1">
+            {INTELLIGENCE_HUB_ITEMS.map((item) => (
+              <SidebarButton key={item.key} item={item} active={activeScreen === item.key} onClick={() => setActiveScreen(item.key)} />
+            ))}
+          </div>
+
+          <p className="mb-2 mt-5 text-xs font-semibold uppercase text-rose-700">Data Views</p>
           <div className="space-y-1">
             {DATA_ITEMS.map((item) => (
               <SidebarButton key={item.key} item={item} active={activeScreen === item.key} onClick={() => setActiveScreen(item.key)} />
@@ -1702,14 +2228,14 @@ function FaroWorkspace({ onBack, onContinueToEditChecks }: { onBack: () => void;
 
         <section className="flex-1 bg-white p-5">
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-            <button onClick={onBack} className="inline-flex items-center gap-2 rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-semibold text-slate-700">
+            <button onClick={onBack} className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-semibold text-slate-700">
               <ArrowLeft size={16} />
               Back To Protocol Ingestion
             </button>
             <div className="flex flex-wrap items-center gap-2">
               <button
                 onClick={aiAlignAll}
-                className="inline-flex items-center gap-2 rounded-lg bg-violet-600 px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-violet-700"
+                className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-blue-500"
               >
                 <Sparkles size={15} />
                 AI Align All
@@ -1746,6 +2272,7 @@ function FaroWorkspace({ onBack, onContinueToEditChecks }: { onBack: () => void;
         </section>
       </div>
     </div>
+    </CommandHubContext.Provider>
   );
 }
 
@@ -1755,12 +2282,238 @@ function SidebarButton({ item, active, onClick }: { item: SidebarItem; active: b
     <button
       onClick={onClick}
       className={`flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm transition ${
-        active ? "bg-blue-600 text-white" : "text-slate-700 hover:bg-slate-200"
+        active ? "border border-rose-300 bg-rose-100 text-rose-700" : "border border-transparent text-slate-700 hover:bg-rose-50"
       }`}
     >
       <Icon size={16} />
       <span>{item.label}</span>
     </button>
+  );
+}
+
+function DataHubView() {
+  const { reconcileRows, setReconcileRows, readinessScore } = useCommandHub();
+  const [running, setRunning] = useState(false);
+  const [selectedSubject, setSelectedSubject] = useState<string | null>(null);
+
+  const subjectMetrics = useMemo(() => {
+    const grouped = new Map<string, { total: number; matched: number }>();
+    reconcileRows.forEach((row) => {
+      const current = grouped.get(row.subjectId) ?? { total: 0, matched: 0 };
+      current.total += 1;
+      if (row.matched) current.matched += 1;
+      grouped.set(row.subjectId, current);
+    });
+    return Array.from(grouped.entries()).map(([subjectId, values]) => ({
+      subjectId,
+      percent: Math.round((values.matched / Math.max(values.total, 1)) * 100),
+    }));
+  }, [reconcileRows]);
+
+  const patientNarrative = useMemo(() => {
+    if (!selectedSubject) return null;
+    const agent = simulationData.agent_swarm.find((item) =>
+      selectedSubject === "001-001" ? item.name.includes("Elena") : item.name.includes("Marcus"),
+    );
+    return {
+      title: `${agent?.name ?? "Patient"} - ${selectedSubject === "001-001" ? "Medium" : "High"} Risk`,
+      story: agent?.narrative ?? "Narrative not available",
+    };
+  }, [selectedSubject]);
+
+  const runAutoReconcile = () => {
+    setRunning(true);
+    window.setTimeout(() => {
+      setReconcileRows((prev) => prev.map((row) => ({ ...row, status: row.matched ? "verified" : row.status })));
+      setRunning(false);
+    }, 1600);
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="rounded-2xl border border-slate-200 bg-white p-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="text-2xl font-semibold text-slate-900">ClearTrial Data Hub</h2>
+            <p className="text-sm text-slate-600">Unified reconciliation workbench for EDC, Labs, and eCOA.</p>
+          </div>
+          <button
+            onClick={runAutoReconcile}
+            disabled={running}
+            className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-500 disabled:opacity-60"
+          >
+            {running ? "Agent-01 Reconciling..." : "Run Auto-Reconcile"}
+          </button>
+        </div>
+      </div>
+
+      <div className="grid gap-4 xl:grid-cols-[1fr_1fr_320px]">
+        <div className="rounded-2xl border border-slate-200 bg-white p-3">
+          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Raw Lab Data</p>
+          <div className="space-y-2 text-xs">
+            {reconcileRows.map((row) => (
+              <div key={`lab-${row.id}`} className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+                <p className="font-semibold text-slate-800">{row.subjectId} • {row.metric}</p>
+                <p className="text-slate-600">{row.labValue}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="rounded-2xl border border-slate-200 bg-white p-3">
+          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">EDC Entries</p>
+          <div className="space-y-2 text-xs">
+            {reconcileRows.map((row) => (
+              <div
+                key={`edc-${row.id}`}
+                className={`rounded-lg border px-3 py-2 ${row.matched ? "border-slate-200 bg-slate-50" : "border-amber-300 bg-amber-50"}`}
+              >
+                <p className="font-semibold text-slate-800">{row.subjectId} • {row.metric}</p>
+                <p className={`${row.matched ? "text-slate-600" : "text-amber-800"}`}>{row.edcValue}</p>
+                <p className="mt-1 text-[11px] text-blue-300">{row.status === "verified" ? "Verified by Agent-01" : "Pending"}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="rounded-2xl border border-slate-200 bg-white p-3">
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Clean Patient Tracker</p>
+          <p className="mt-1 text-xs text-slate-600">Data Readiness {readinessScore}%</p>
+          <div className="mt-3 grid grid-cols-2 gap-3">
+            {subjectMetrics.map((subject) => (
+              <button
+                key={subject.subjectId}
+                onClick={() => setSelectedSubject(subject.subjectId)}
+                className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-center"
+              >
+                <div
+                  className="mx-auto h-12 w-12 rounded-full"
+                  style={{ background: `conic-gradient(#2563EB ${subject.percent * 3.6}deg, #1E293B 0deg)` }}
+                >
+                  <div className="m-1 flex h-10 w-10 items-center justify-center rounded-full bg-white text-[11px] font-semibold text-slate-700">
+                    {subject.percent}%
+                  </div>
+                </div>
+                <p className="mt-2 text-[11px] text-slate-700">{subject.subjectId}</p>
+              </button>
+            ))}
+          </div>
+          {patientNarrative && (
+            <div className="mt-3 rounded-xl border border-blue-500/50 bg-blue-500/10 p-3 text-xs text-blue-100">
+              <p className="font-semibold">{patientNarrative.title}</p>
+              <p className="mt-1">{patientNarrative.story}</p>
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="rounded-2xl border border-slate-200 bg-white p-3">
+        <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Agent Link Visual</p>
+        <svg viewBox="0 0 1200 120" className="h-20 w-full">
+          {reconcileRows.slice(0, 5).map((row, index) => {
+            const y = 15 + index * 22;
+            return (
+              <g key={`line-${row.id}`}>
+                <line x1="120" y1={y} x2="1080" y2={y} stroke={row.matched ? "#38BDF8" : "#F59E0B"} strokeWidth="2" strokeDasharray="6 5" className="animate-pulse" />
+                <circle cx="120" cy={y} r="3" fill="#38BDF8" />
+                <circle cx="1080" cy={y} r="3" fill={row.matched ? "#22C55E" : "#F59E0B"} />
+              </g>
+            );
+          })}
+        </svg>
+      </div>
+    </div>
+  );
+}
+
+function QueryManagerView() {
+  const { queries, approveQuery } = useCommandHub();
+
+  const incrementReadinessFromClose = (count: number) => {
+    const openItems = queries.filter((item) => item.status === "open").slice(0, count);
+    openItems.forEach((item) => approveQuery(item.id));
+  };
+
+  return (
+    <Suspense fallback={<ModuleLoadingCard title="Query Manager" subtitle="Loading query workflow and assignment queues..." />}>
+      <QueryManager onCloseForReadiness={incrementReadinessFromClose} />
+    </Suspense>
+  );
+}
+
+function OperationsMonitorView() {
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-white p-5">
+      <h2 className="text-2xl font-semibold text-slate-900">Operations Monitor</h2>
+      <p className="mt-2 text-sm text-slate-600">High-density operational telemetry for enrollment, reconciliation latency, and site backlog.</p>
+      <div className="mt-4 grid gap-3 md:grid-cols-3">
+        {[
+          ["EDC Backlog", "3 days"],
+          ["Lab Feed Delay", "41 min"],
+          ["eCOA Sync", "Healthy"],
+        ].map(([label, value]) => (
+          <div key={label} className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
+            <p className="text-xs uppercase text-slate-500">{label}</p>
+            <p className="mt-1 text-lg font-semibold text-slate-800">{value}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function TrialSandboxView() {
+  return (
+    <div className="space-y-4">
+      <div className="rounded-2xl border border-slate-200 bg-white p-4">
+        <h2 className="text-2xl font-semibold text-slate-900">Insights & Faro Predict</h2>
+        <p className="mt-1 text-sm text-slate-600">Faro Interview: I detected a 20% dropout risk in rural sites. Should I prioritize cost or speed in this simulation?</p>
+      </div>
+      <Suspense fallback={<ModuleLoadingCard title="Insights & Faro Predict" subtitle="Loading simulation agents and predictive models..." />}>
+        <FaroPredict />
+      </Suspense>
+    </div>
+  );
+}
+
+function ModuleLoadingCard({ title, subtitle }: { title: string; subtitle: string }) {
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+      <p className="text-base font-semibold text-slate-900">{title}</p>
+      <p className="mt-1 text-sm text-slate-600">{subtitle}</p>
+      <div className="mt-4 h-2 w-full overflow-hidden rounded-full bg-slate-100">
+        <div className="h-full w-1/3 animate-pulse rounded-full bg-blue-500" />
+      </div>
+    </div>
+  );
+}
+
+function StudyDifferencesView() {
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-white p-5">
+      <div className="mb-4 flex items-center justify-between">
+        <h2 className="text-2xl font-semibold text-slate-900">Study Differences Report</h2>
+        <button className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white">Generate Report</button>
+      </div>
+      <div className="grid gap-3 lg:grid-cols-2">
+        <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+          <p className="text-xs uppercase tracking-wide text-slate-500">Human Design</p>
+          <ul className="mt-2 space-y-1 text-sm text-slate-700">
+            <li>Visit burden fixed across all sites</li>
+            <li>Static AE surveillance cadence</li>
+            <li>Manual lab reconciliation path</li>
+          </ul>
+        </div>
+        <div className="rounded-xl border border-blue-500/40 bg-blue-500/10 p-3">
+          <p className="text-xs uppercase tracking-wide text-blue-300">AI-Optimized Design</p>
+          <ul className="mt-2 space-y-1 text-sm text-blue-100">
+            <li>Adaptive visit cadence by risk persona</li>
+            <li>AE-triggered dynamic checks</li>
+            <li>Agent-verified reconciliation loop</li>
+          </ul>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -2226,18 +2979,6 @@ function ActivityConfigurationView({ activityName, onSaveMap }: { activityName: 
       <button onClick={onSaveMap} className="mt-5 rounded-lg bg-blue-600 px-4 py-2 font-semibold text-white hover:bg-blue-700">
         Save & Map
       </button>
-    </div>
-  );
-}
-
-function InsightsView() {
-  return (
-    <div className="space-y-4">
-      <div className="rounded-2xl border border-slate-200 bg-white p-6">
-        <h2 className="text-3xl font-semibold">Insights</h2>
-        <p className="text-sm text-slate-600">Scenario modeling and AI swarm simulation for operational and efficacy tradeoff testing.</p>
-      </div>
-      <FaroPredict />
     </div>
   );
 }
@@ -3203,27 +3944,38 @@ function Phase2View({
   auditLogs: AuditLog[];
   onBackToDashboard: () => void;
 }) {
+  void onRoleChange;
   const [siteId, setSiteId] = useState("001");
   const [region, setRegion] = useState("North America");
   const [country, setCountry] = useState("United States");
   const [dob, setDob] = useState("1991-04-03");
   const [enrolledAt, setEnrolledAt] = useState("2026-01-10");
   const [subjectSearch, setSubjectSearch] = useState("");
+  const [subjectSiteFilter, setSubjectSiteFilter] = useState("all");
+  const [subjectFromSite, setSubjectFromSite] = useState("");
   const [selectedSubjectId, setSelectedSubjectId] = useState("");
   const [selectedVisit, setSelectedVisit] = useState("Day 1");
   const [selectedCrfForEntry, setSelectedCrfForEntry] = useState("");
   const [selectedFieldForAudit, setSelectedFieldForAudit] = useState("");
-  const [phase2Section, setPhase2Section] = useState<"enrollment" | "entry">("enrollment");
+  const [phase2Section, setPhase2Section] = useState<"enrollment" | "entry" | "datahub" | "reporting">("datahub");
+  const [dataHubCategory, setDataHubCategory] = useState<"none" | "study-summary" | "schedule-assessments" | "both">("none");
   const [fieldEntryValues, setFieldEntryValues] = useState<Record<string, string>>({});
   const [crfEditModeMap, setCrfEditModeMap] = useState<Record<string, boolean>>({});
   const [entryError, setEntryError] = useState("");
   const [formStatusMessage, setFormStatusMessage] = useState("");
   const [reviewNote, setReviewNote] = useState("");
 
-  const siteRoles: Phase2Role[] = ["CRA", "PI", "CRC"];
-  const reviewRoles: Phase2Role[] = ["DM", "Sponsor"];
+  const siteRoles: Phase2Role[] = ["CRA", "CRC"];
+  const reviewRoles: Phase2Role[] = ["PI", "DM", "Sponsor"];
   const canEnterData = siteRoles.includes(role);
   const canReviewData = reviewRoles.includes(role);
+
+  useEffect(() => {
+    // Keep Subject Enrollment and Data Entry Portal visible only for CRA/CRC.
+    if (!canEnterData && (phase2Section === "entry" || phase2Section === "enrollment")) {
+      setPhase2Section("datahub");
+    }
+  }, [canEnterData, phase2Section]);
 
   const crfFieldMap = useMemo(() => {
     const map = new Map<string, Array<{ fieldLabel: string; fieldType: CrfFieldType; allowedValues?: string; allowOther?: boolean }>>();
@@ -3266,12 +4018,53 @@ function Phase2View({
   }, [subjects, selectedSubjectId]);
 
   const selectedSubject = subjects.find((subject) => subject.id === selectedSubjectId) ?? null;
+  const selectedSubjectSite = useMemo(() => {
+    if (!selectedSubject) return null;
+    return SITE_DIRECTORY.find((site) => site.id === selectedSubject.siteId) ?? null;
+  }, [selectedSubject]);
 
   const filteredSubjects = useMemo(() => {
     const query = subjectSearch.trim().toLowerCase();
     if (!query) return subjects;
     return subjects.filter((subject) => subject.id.toLowerCase().includes(query));
   }, [subjects, subjectSearch]);
+
+  const enrolledSiteOptions = useMemo(() => {
+    const uniqueSites = Array.from(new Set(subjects.map((subject) => subject.siteId)));
+    return uniqueSites
+      .map(
+        (id) =>
+          SITE_DIRECTORY.find((site) => site.id === id) ?? {
+            id,
+            name: `Site ${id}`,
+            region: "Unknown",
+            country: "Unknown",
+            cecTeam: [],
+            craTeam: [],
+            piTeam: [],
+            dmTeam: [],
+            sponsorTeam: [],
+          },
+      )
+      .sort((a, b) => a.id.localeCompare(b.id));
+  }, [subjects]);
+
+  const subjectsForSelectedSite = useMemo(() => {
+    if (subjectSiteFilter === "all") {
+      return subjects;
+    }
+    return subjects.filter((subject) => subject.siteId === subjectSiteFilter);
+  }, [subjects, subjectSiteFilter]);
+
+  useEffect(() => {
+    if (subjectsForSelectedSite.length === 0) {
+      setSubjectFromSite("");
+      return;
+    }
+    if (!subjectFromSite || !subjectsForSelectedSite.some((subject) => subject.id === subjectFromSite)) {
+      setSubjectFromSite(subjectsForSelectedSite[0].id);
+    }
+  }, [subjectsForSelectedSite, subjectFromSite]);
 
   const visitOptions = useMemo(() => {
     const includedCrfs = new Set(Array.from(crfFieldMap.keys()));
@@ -3558,98 +4351,226 @@ function Phase2View({
     );
   }, [contextAuditLogs]);
 
+  // Phase 2 header metrics for DataHub view so operational cards sit next to the main title block.
+  const phase2DataHubRecords = useMemo<DataHubRecord[]>(() => {
+    const edcRows: DataHubRecord[] = entries.map((entry) => ({
+      id: `edc-${entry.id}`,
+      projectId: entry.projectId,
+      subjectId: entry.subjectId,
+      siteId: entry.subjectId.split("-")[0] ?? "001",
+      visit: entry.visit,
+      formType: entry.crf,
+      fieldLabel: entry.fieldLabel,
+      value: entry.value,
+      source: "EDC",
+      queryStatus: entry.status === "queried" ? "open" : "none",
+      capturedAt: entry.enteredAt,
+    }));
+
+    const externalRows = project
+      ? MOCK_DATAHUB_EXTERNAL.map((record) => ({ ...record, projectId: project.id }))
+      : MOCK_DATAHUB_EXTERNAL;
+
+    return [...edcRows, ...externalRows];
+  }, [entries, project]);
+
+  const phase2DataHubSummary = useMemo(() => {
+    const total = phase2DataHubRecords.length;
+    const queryCount = phase2DataHubRecords.filter((row) => row.queryStatus === "open").length;
+    const uniqueSubjects = new Set(phase2DataHubRecords.map((row) => row.subjectId)).size;
+    const uniqueForms = new Set(phase2DataHubRecords.map((row) => row.formType)).size;
+    const sourceCounts = phase2DataHubRecords.reduce<Record<string, number>>((acc, row) => {
+      acc[row.source] = (acc[row.source] ?? 0) + 1;
+      return acc;
+    }, {});
+
+    return {
+      uniqueSubjects,
+      uniqueForms,
+      queryCount,
+      sourceCount: Object.keys(sourceCounts).length,
+      completeness: total === 0 ? 0 : Math.round((phase2DataHubRecords.filter((row) => row.value !== "" && row.value !== "-").length / total) * 100),
+      queryRate: total === 0 ? 0 : Number(((queryCount / total) * 100).toFixed(1)),
+      sourceDistribution: Object.entries(sourceCounts)
+        .map(([source, count]) => `${source}: ${count}`)
+        .join(" | "),
+    };
+  }, [phase2DataHubRecords]);
+
   return (
     <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
       <button onClick={onBackToDashboard} className="mb-3 inline-flex items-center gap-2 text-sm font-semibold text-slate-600 hover:text-slate-900">
         <ArrowLeft size={16} /> Back To Dashboard
       </button>
 
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h2 className="text-3xl font-semibold">Phase 2 - Live Environment</h2>
-          <p className="text-slate-600">{project?.title ?? "Project"} is now live.</p>
-        </div>
-        <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-800">LIVE</span>
-      </div>
+      <div className="mb-4 space-y-3">
+        <div className="rounded-xl border border-slate-200 bg-white p-3">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <h2 className="text-3xl font-semibold">Phase 2 - Live Environment</h2>
+              <p className="text-slate-600">{project?.title ?? "Project"} is now live.</p>
+            </div>
+            <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-800">LIVE</span>
+          </div>
 
-      <div className="mb-4 flex flex-wrap gap-2">
-        {(["CRA", "DM", "PI", "CRC", "Sponsor"] as const).map((r) => (
-          <button
-            key={r}
-            onClick={() => onRoleChange(r)}
-            className={`rounded-lg px-3 py-2 text-sm font-semibold ${role === r ? "bg-red-600 text-white" : "border border-slate-300 bg-white"}`}
-          >
-            {r}
-          </button>
-        ))}
-      </div>
-
-      <div className="mb-4 rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
-        <p className="font-semibold">Role-Based Data Access</p>
-        <p>Site roles (CRA/PI/CRC) can create source data entries. DM and Sponsor can review submitted entries, mark reviewed, and raise query state.</p>
-      </div>
-
-      <div className="mb-4 rounded-xl border border-slate-200 p-3">
-        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Subject Search & Quick Navigation</p>
-        <div className="mt-2 flex flex-wrap items-center gap-2">
-          <input
-            value={subjectSearch}
-            onChange={(e) => setSubjectSearch(e.target.value)}
-            className="w-full max-w-sm rounded-lg border border-slate-300 px-3 py-2 text-sm"
-            placeholder="Search subject (e.g., 001-002)"
-          />
-          <button
-            onClick={() => {
-              const target = filteredSubjects[0];
-              if (!target) return;
-              setSelectedSubjectId(target.id);
-              setPhase2Section("entry");
-            }}
-            className="rounded-md bg-blue-600 px-3 py-2 text-xs font-semibold text-white"
-          >
-            Open First Match
-          </button>
-        </div>
-        {subjectSearch.trim() && (
-          <div className="mt-2 flex flex-wrap gap-2">
-            {filteredSubjects.slice(0, 8).map((subject) => (
+          <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50 p-2">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Subject Navigation</p>
+            <div className="mt-1.5 grid gap-2 md:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)_minmax(0,1fr)_auto]">
+              <label className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+                Subject Search
+                <input
+                  value={subjectSearch}
+                  onChange={(e) => setSubjectSearch(e.target.value)}
+                  className="mt-1 w-full rounded-md border border-slate-300 px-2 py-1.5 text-xs"
+                  placeholder="001-002"
+                />
+              </label>
+              <label className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+                Enrolled Site
+                <select
+                  value={subjectSiteFilter}
+                  onChange={(event) => {
+                    setSubjectSiteFilter(event.target.value);
+                    setSubjectFromSite("");
+                  }}
+                  className="mt-1 w-full rounded-md border border-slate-300 px-2 py-1.5 text-xs"
+                >
+                  <option value="all">All Enrolled Sites</option>
+                  {enrolledSiteOptions.map((site) => (
+                    <option key={site.id} value={site.id}>
+                      {site.id} - {site.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+                Enrolled Subject
+                <select
+                  value={subjectFromSite}
+                  onChange={(event) => setSubjectFromSite(event.target.value)}
+                  className="mt-1 w-full rounded-md border border-slate-300 px-2 py-1.5 text-xs"
+                >
+                  {subjectsForSelectedSite.map((subject) => (
+                    <option key={subject.id} value={subject.id}>
+                      {subject.id}
+                    </option>
+                  ))}
+                </select>
+              </label>
               <button
-                key={subject.id}
                 onClick={() => {
-                  setSelectedSubjectId(subject.id);
-                  setPhase2Section("entry");
+                  const target = subjectSearch.trim() ? filteredSubjects[0]?.id : subjectFromSite;
+                  if (!target) return;
+                  setSelectedSubjectId(target);
+                  setPhase2Section(canEnterData ? "entry" : "datahub");
                 }}
-                className="rounded-full border border-slate-300 bg-white px-3 py-1 text-xs font-semibold text-slate-700 hover:border-blue-300 hover:text-blue-700"
+                className="self-end rounded-md border border-blue-300 bg-white px-2.5 py-1.5 text-[11px] font-semibold text-blue-700"
               >
-                {subject.id}
+                Go
               </button>
-            ))}
-            {filteredSubjects.length === 0 && <span className="text-xs text-slate-500">No subject matches found.</span>}
+            </div>
+            {subjectSearch.trim() && filteredSubjects.length > 0 && (
+              <div className="mt-1.5 flex flex-wrap gap-1.5">
+                {filteredSubjects.slice(0, 4).map((subject) => (
+                  <button
+                    key={subject.id}
+                    onClick={() => {
+                      setSelectedSubjectId(subject.id);
+                      setPhase2Section(canEnterData ? "entry" : "datahub");
+                    }}
+                    className="rounded-full border border-slate-300 bg-white px-2 py-0.5 text-[10px] font-semibold text-slate-700 hover:border-blue-300 hover:text-blue-700"
+                  >
+                    {subject.id}
+                  </button>
+                ))}
+              </div>
+            )}
+            {subjectSearch.trim() && filteredSubjects.length === 0 && <p className="mt-1.5 text-[11px] text-slate-500">No match.</p>}
+          </div>
+
+          <div className="mt-2 grid gap-2 md:grid-cols-[auto_auto_minmax(220px,320px)] md:items-end">
+            <button
+              onClick={() => setPhase2Section("datahub")}
+              className={`rounded-md px-2.5 py-1.5 text-[11px] font-semibold ${phase2Section === "datahub" ? "bg-blue-600 text-white" : "border border-slate-300 bg-white text-slate-700"}`}
+            >
+              DataHub
+            </button>
+            <button
+              onClick={() => setPhase2Section("reporting")}
+              className={`rounded-md px-2.5 py-1.5 text-[11px] font-semibold ${phase2Section === "reporting" ? "bg-blue-600 text-white" : "border border-slate-300 bg-white text-slate-700"}`}
+            >
+              Reporting
+            </button>
+            <label className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+              Category Group
+              <select
+                value={dataHubCategory}
+                onChange={(event) => setDataHubCategory(event.target.value as "none" | "study-summary" | "schedule-assessments" | "both")}
+                disabled={phase2Section !== "datahub"}
+                className="mt-1 w-full rounded-md border border-slate-300 bg-white px-2 py-1.5 text-xs disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
+              >
+                <option value="none">Select View</option>
+                <option value="study-summary">Study Summary</option>
+                <option value="schedule-assessments">Schedule Of Assessments View</option>
+                <option value="both">Both</option>
+              </select>
+            </label>
+          </div>
+        </div>
+
+        {(phase2Section !== "datahub" || dataHubCategory === "study-summary" || dataHubCategory === "both") && (
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <StatCard label="Enrolled" value="156" icon={<Users size={18} />} />
+            <StatCard label="Open Queries" value="23" icon={<Info size={18} />} />
+            <StatCard label="Sites Active" value="12" icon={<FlaskConical size={18} />} />
+            <StatCard label="Data Points" value="18,942" icon={<BarChart3 size={18} />} />
           </div>
         )}
-      </div>
 
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard label="Enrolled" value="156" icon={<Users size={18} />} />
-        <StatCard label="Open Queries" value="23" icon={<Info size={18} />} />
-        <StatCard label="Sites Active" value="12" icon={<FlaskConical size={18} />} />
-        <StatCard label="Data Points" value="18,942" icon={<BarChart3 size={18} />} />
+        {phase2Section === "datahub" && (dataHubCategory === "study-summary" || dataHubCategory === "both") && (
+          <Fragment>
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <StatCard label="Total Subjects" value={String(phase2DataHubSummary.uniqueSubjects)} icon={<Users size={18} />} />
+              <StatCard label="Forms Completed" value={String(phase2DataHubSummary.uniqueForms)} icon={<CheckCircle2 size={18} />} />
+              <StatCard label="Queries Open" value={String(phase2DataHubSummary.queryCount)} icon={<Info size={18} />} />
+              <StatCard label="Data Sources" value={String(phase2DataHubSummary.sourceCount)} icon={<FlaskConical size={18} />} />
+            </div>
+            <div className="grid gap-3 md:grid-cols-3">
+              <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Data Completeness %</p>
+                <p className="mt-1 text-2xl font-semibold text-slate-900">{phase2DataHubSummary.completeness}%</p>
+              </div>
+              <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Query Rate</p>
+                <p className="mt-1 text-2xl font-semibold text-slate-900">{phase2DataHubSummary.queryRate}%</p>
+              </div>
+              <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Source Distribution</p>
+                <p className="mt-1 text-sm font-semibold text-slate-800">{phase2DataHubSummary.sourceDistribution}</p>
+              </div>
+            </div>
+          </Fragment>
+        )}
       </div>
 
       <div className="mt-4 rounded-xl border border-slate-200 p-4">
         <div className="mb-3 flex flex-wrap items-center gap-2">
-          <button
-            onClick={() => setPhase2Section("enrollment")}
-            className={`rounded-md px-3 py-2 text-sm font-semibold ${phase2Section === "enrollment" ? "bg-blue-600 text-white" : "border border-slate-300 bg-white"}`}
-          >
-            Subject Enrollment
-          </button>
-          <button
-            onClick={() => setPhase2Section("entry")}
-            className={`rounded-md px-3 py-2 text-sm font-semibold ${phase2Section === "entry" ? "bg-blue-600 text-white" : "border border-slate-300 bg-white"}`}
-          >
-            Data Entry Portal
-          </button>
+          {canEnterData && (
+            <>
+              <button
+                onClick={() => setPhase2Section("enrollment")}
+                className={`rounded-md px-3 py-2 text-sm font-semibold ${phase2Section === "enrollment" ? "bg-blue-600 text-white" : "border border-slate-300 bg-white"}`}
+              >
+                Subject Enrollment
+              </button>
+              <button
+                onClick={() => setPhase2Section("entry")}
+                className={`rounded-md px-3 py-2 text-sm font-semibold ${phase2Section === "entry" ? "bg-blue-600 text-white" : "border border-slate-300 bg-white"}`}
+              >
+                Data Entry Portal
+              </button>
+            </>
+          )}
         </div>
 
         {phase2Section === "enrollment" ? (
@@ -3711,16 +4632,18 @@ function Phase2View({
                       <td className="border border-slate-200 px-3 py-2">{s.enrolledAt}</td>
                       <td className="border border-slate-200 px-3 py-2">
                         <div className="flex gap-2">
-                          <button
-                            onClick={() => {
-                              setSelectedSubjectId(s.id);
-                              if (visitOptions.length > 0) setSelectedVisit(visitOptions[0]);
-                              setPhase2Section("entry");
-                            }}
-                            className="rounded-md bg-blue-600 px-2 py-1 text-xs font-semibold text-white"
-                          >
-                            Enter Data
-                          </button>
+                          {canEnterData && (
+                            <button
+                              onClick={() => {
+                                setSelectedSubjectId(s.id);
+                                if (visitOptions.length > 0) setSelectedVisit(visitOptions[0]);
+                                setPhase2Section("entry");
+                              }}
+                              className="rounded-md bg-blue-600 px-2 py-1 text-xs font-semibold text-white"
+                            >
+                              Enter Data
+                            </button>
+                          )}
                           <button onClick={() => onDelete(s.id)} className="rounded-md border border-red-300 px-2 py-1 text-xs font-semibold text-red-700">Delete</button>
                         </div>
                       </td>
@@ -3735,7 +4658,7 @@ function Phase2View({
               </table>
             </div>
           </>
-        ) : (
+        ) : phase2Section === "entry" ? (
           <>
             <h3 className="text-xl font-semibold">Data Entry Portal</h3>
             <p className="mt-1 text-sm text-slate-600">Subject-level page with horizontal visit tabs and vertical CRF list based on Schedule of Activities.</p>
@@ -3752,7 +4675,56 @@ function Phase2View({
               <div className="mt-3 space-y-4">
                 <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
                   <p className="text-sm font-semibold">Subject Details</p>
-                  <p className="mt-1 text-sm text-slate-700">{selectedSubject.id} • Site {selectedSubject.siteId} • {selectedSubject.region}, {selectedSubject.country}</p>
+                  <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-700">
+                    <span className="font-semibold">{selectedSubject.id}</span>
+                    <span>Site Name: <span className="font-semibold">{selectedSubjectSite?.name ?? `Site ${selectedSubject.siteId}`}</span></span>
+                    <span>Site ID: {selectedSubject.siteId}</span>
+                    <span>{selectedSubject.region}, {selectedSubject.country}</span>
+                  </div>
+                  {selectedSubjectSite && (
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      <label className="inline-flex items-center gap-1 rounded-md border border-slate-300 bg-white px-1.5 py-1 text-[10px]">
+                        <span className="font-semibold text-slate-600">CEC</span>
+                        <select className="max-w-[170px] bg-transparent text-[10px]">
+                          {selectedSubjectSite.cecTeam.map((member) => (
+                            <option key={member.email} value={member.email}>{member.name} • {member.email}</option>
+                          ))}
+                        </select>
+                      </label>
+                      <label className="inline-flex items-center gap-1 rounded-md border border-slate-300 bg-white px-1.5 py-1 text-[10px]">
+                        <span className="font-semibold text-slate-600">CRA</span>
+                        <select className="max-w-[170px] bg-transparent text-[10px]">
+                          {selectedSubjectSite.craTeam.map((member) => (
+                            <option key={member.email} value={member.email}>{member.name} • {member.email}</option>
+                          ))}
+                        </select>
+                      </label>
+                      <label className="inline-flex items-center gap-1 rounded-md border border-slate-300 bg-white px-1.5 py-1 text-[10px]">
+                        <span className="font-semibold text-slate-600">PI</span>
+                        <select className="max-w-[170px] bg-transparent text-[10px]">
+                          {selectedSubjectSite.piTeam.map((member) => (
+                            <option key={member.email} value={member.email}>{member.name} • {member.email}</option>
+                          ))}
+                        </select>
+                      </label>
+                      <label className="inline-flex items-center gap-1 rounded-md border border-slate-300 bg-white px-1.5 py-1 text-[10px]">
+                        <span className="font-semibold text-slate-600">DM</span>
+                        <select className="max-w-[170px] bg-transparent text-[10px]">
+                          {selectedSubjectSite.dmTeam.map((member) => (
+                            <option key={member.email} value={member.email}>{member.name} • {member.email}</option>
+                          ))}
+                        </select>
+                      </label>
+                      <label className="inline-flex items-center gap-1 rounded-md border border-slate-300 bg-white px-1.5 py-1 text-[10px]">
+                        <span className="font-semibold text-slate-600">Sponsor</span>
+                        <select className="max-w-[170px] bg-transparent text-[10px]">
+                          {selectedSubjectSite.sponsorTeam.map((member) => (
+                            <option key={member.email} value={member.email}>{member.name} • {member.email}</option>
+                          ))}
+                        </select>
+                      </label>
+                    </div>
+                  )}
                 </div>
 
                 <div className="rounded-xl border border-slate-200 p-3">
@@ -3968,6 +4940,20 @@ function Phase2View({
               </div>
             )}
           </>
+        ) : phase2Section === "datahub" ? (
+          <Phase2DataHubView
+            project={project}
+            subjects={subjects}
+            entries={entries}
+            auditLogs={auditLogs}
+            role={role}
+            dataHubCategory={dataHubCategory}
+            selectedSubjectId={selectedSubjectId}
+          />
+        ) : phase2Section === "reporting" ? (
+          <Phase2ReportingView project={project} finalizedCrfs={finalizedCrfs} entries={entries} />
+        ) : (
+          <Phase2ReportingView project={project} finalizedCrfs={finalizedCrfs} entries={entries} />
         )}
       </div>
 
@@ -3999,12 +4985,803 @@ function Phase2View({
   );
 }
 
+function Phase2DataHubView({
+  project,
+  subjects,
+  entries,
+  auditLogs,
+  role,
+  dataHubCategory,
+  selectedSubjectId,
+}: {
+  project: Project | null;
+  subjects: Subject[];
+  entries: DataEntryRecord[];
+  auditLogs: AuditLog[];
+  role: "CRA" | "DM" | "PI" | "CRC" | "Sponsor";
+  dataHubCategory: "none" | "study-summary" | "schedule-assessments" | "both";
+  selectedSubjectId: string;
+}) {
+  const [expandedRow, setExpandedRow] = useState<string | null>(null);
+  const [dmSelectedVisit, setDmSelectedVisit] = useState("Day -1");
+  const [dmSelectedCrf, setDmSelectedCrf] = useState("");
+  const [dmSelectedField, setDmSelectedField] = useState("");
+
+  const scheduleActivities = useMemo(() => {
+    if (!selectedSubjectId) return Object.keys(MATRIX);
+    const subjectCrfs = Array.from(
+      new Set(entries.filter((entry) => entry.subjectId === selectedSubjectId).map((entry) => entry.crf)),
+    );
+    return subjectCrfs.length > 0 ? subjectCrfs : Object.keys(MATRIX);
+  }, [entries, selectedSubjectId]);
+
+  const siteBySubject = useMemo(() => {
+    const map = new Map<string, string>();
+    subjects.forEach((subject) => map.set(subject.id, subject.siteId));
+    return map;
+  }, [subjects]);
+
+  const edcRecords = useMemo<DataHubRecord[]>(() => {
+    return entries.map((entry) => ({
+      id: `edc-${entry.id}`,
+      projectId: entry.projectId,
+      subjectId: entry.subjectId,
+      siteId: siteBySubject.get(entry.subjectId) ?? entry.subjectId.split("-")[0] ?? "001",
+      visit: entry.visit,
+      formType: entry.crf,
+      fieldLabel: entry.fieldLabel,
+      value: entry.value,
+      source: "EDC",
+      queryStatus: entry.status === "queried" ? "open" : "none",
+      capturedAt: entry.enteredAt,
+    }));
+  }, [entries, siteBySubject]);
+
+  const externalRecords = useMemo(() => {
+    if (!project) return MOCK_DATAHUB_EXTERNAL;
+    return MOCK_DATAHUB_EXTERNAL.map((record) => ({
+      ...record,
+      projectId: project.id,
+    }));
+  }, [project]);
+
+  const allRecords = useMemo(() => {
+    const scopedExternal = externalRecords.filter((record) => !project || record.projectId === project.id || record.projectId === "all");
+    return [...edcRecords, ...scopedExternal].sort((a, b) => new Date(b.capturedAt).getTime() - new Date(a.capturedAt).getTime());
+  }, [edcRecords, externalRecords, project]);
+
+  const scheduleHeatmap = useMemo(() => {
+    const countMap = new Map<string, number>();
+    allRecords.forEach((record) => {
+      const key = `${record.formType}::${record.visit}`;
+      countMap.set(key, (countMap.get(key) ?? 0) + 1);
+    });
+    return countMap;
+  }, [allRecords]);
+
+  const dmVisitSequence = useMemo(() => {
+    if (!selectedSubjectId) return DAYS.map((day) => `Day ${day}`);
+    const visitLabels = Array.from(
+      new Set(entries.filter((entry) => entry.subjectId === selectedSubjectId).map((entry) => entry.visit)),
+    );
+    if (visitLabels.length === 0) return DAYS.map((day) => `Day ${day}`);
+    return visitLabels.sort((a, b) => {
+      const dayA = Number(a.replace("Day", "").trim());
+      const dayB = Number(b.replace("Day", "").trim());
+      return dayA - dayB;
+    });
+  }, [entries, selectedSubjectId]);
+
+  const dmSubjects = useMemo(() => {
+    return subjects.filter((subject) => entries.some((entry) => entry.subjectId === subject.id));
+  }, [subjects, entries]);
+
+  const dmEffectiveSubjectId = useMemo(() => {
+    if (selectedSubjectId && dmSubjects.some((subject) => subject.id === selectedSubjectId)) return selectedSubjectId;
+    return "";
+  }, [selectedSubjectId, dmSubjects]);
+
+  const dmSubject = useMemo(() => subjects.find((subject) => subject.id === dmEffectiveSubjectId) ?? null, [subjects, dmEffectiveSubjectId]);
+  const dmSubjectSite = useMemo(() => {
+    if (!dmSubject) return null;
+    return SITE_DIRECTORY.find((site) => site.id === dmSubject.siteId) ?? null;
+  }, [dmSubject]);
+
+  useEffect(() => {
+    setDmSelectedVisit("Day -1");
+    setDmSelectedField("");
+  }, [dmEffectiveSubjectId]);
+
+  const getDayNumberFromVisit = (visit: string) => {
+    const parsed = Number(visit.replace("Day", "").trim());
+    return Number.isFinite(parsed) ? parsed : -1;
+  };
+
+  const getScheduledCrfsForVisit = (visit: string) => {
+    const day = getDayNumberFromVisit(visit);
+    return scheduleActivities.filter((crf) => Boolean(MATRIX[crf]?.[day]));
+  };
+
+  const isDmFormComplete = (subjectId: string, visit: string, crfName: string) => {
+    const expectedFields = (CRF_FIELD_LIBRARY[crfName] ?? []).map((field) => field.fieldLabel);
+    if (expectedFields.length === 0) {
+      return entries.some((entry) => entry.subjectId === subjectId && entry.visit === visit && entry.crf === crfName);
+    }
+    return expectedFields.every((fieldLabel) =>
+      entries.some((entry) => entry.subjectId === subjectId && entry.visit === visit && entry.crf === crfName && entry.fieldLabel === fieldLabel),
+    );
+  };
+
+  const isDmVisitComplete = (subjectId: string, visit: string) => {
+    const scheduledCrfs = getScheduledCrfsForVisit(visit);
+    if (scheduledCrfs.length === 0) return false;
+    return scheduledCrfs.every((crfName) => isDmFormComplete(subjectId, visit, crfName));
+  };
+
+  const isDmVisitUnlocked = (subjectId: string, visit: string) => {
+    const index = dmVisitSequence.indexOf(visit);
+    if (index <= 0) return true;
+    const previousVisit = dmVisitSequence[index - 1];
+    return isDmVisitComplete(subjectId, previousVisit);
+  };
+
+  const dmScheduledCrfs = useMemo(() => getScheduledCrfsForVisit(dmSelectedVisit), [dmSelectedVisit, scheduleActivities]);
+
+  useEffect(() => {
+    if (dmScheduledCrfs.length > 0 && !dmScheduledCrfs.includes(dmSelectedCrf)) {
+      setDmSelectedCrf(dmScheduledCrfs[0]);
+      setDmSelectedField("");
+    }
+    if (dmScheduledCrfs.length === 0) {
+      setDmSelectedCrf("");
+      setDmSelectedField("");
+    }
+  }, [dmScheduledCrfs, dmSelectedCrf]);
+
+  const dmExpectedFields = useMemo(() => {
+    return (CRF_FIELD_LIBRARY[dmSelectedCrf] ?? []).map((field) => field.fieldLabel);
+  }, [dmSelectedCrf]);
+
+  const dmFormEntries = useMemo(() => {
+    if (!dmEffectiveSubjectId || !dmSelectedVisit || !dmSelectedCrf) return [] as DataEntryRecord[];
+    return entries
+      .filter((entry) => entry.subjectId === dmEffectiveSubjectId && entry.visit === dmSelectedVisit && entry.crf === dmSelectedCrf)
+      .sort((a, b) => new Date(a.enteredAt).getTime() - new Date(b.enteredAt).getTime());
+  }, [entries, dmSelectedCrf, dmEffectiveSubjectId, dmSelectedVisit]);
+
+  const dmScopedEntries = useMemo(() => {
+    if (!dmSelectedField) return dmFormEntries;
+    return dmFormEntries.filter((entry) => entry.fieldLabel === dmSelectedField);
+  }, [dmFormEntries, dmSelectedField]);
+
+  const dmScopeTokens = [dmEffectiveSubjectId, dmSelectedVisit, dmSelectedCrf, dmSelectedField].filter(Boolean) as string[];
+  const dmScopedAuditLogs = useMemo(() => {
+    if (dmScopeTokens.length === 0) return [] as AuditLog[];
+    return auditLogs
+      .filter((log) => dmScopeTokens.some((token) => log.action.includes(token)))
+      .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+  }, [auditLogs, dmScopeTokens]);
+
+  const sourceBadge = (source: DataSourceType) => {
+    switch (source) {
+      case "EDC":
+        return "bg-blue-100 text-blue-800";
+      case "RTSM":
+        return "bg-violet-100 text-violet-800";
+      case "Labs":
+        return "bg-emerald-100 text-emerald-800";
+      case "eCOA":
+        return "bg-cyan-100 text-cyan-800";
+      case "Safety":
+        return "bg-rose-100 text-rose-800";
+      default:
+        return "bg-slate-100 text-slate-700";
+    }
+  };
+
+  return (
+    <>
+      {(dataHubCategory === "schedule-assessments" || dataHubCategory === "both") && (
+      <div className="mt-3 rounded-xl border border-slate-200 p-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Schedule Of Assessments View</p>
+          <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-600">
+            <span className="inline-flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-blue-500" /> Scheduled + Data</span>
+            <span className="inline-flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-slate-300" /> Scheduled + No Data</span>
+            <span className="inline-flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-slate-200" /> Not Scheduled</span>
+          </div>
+        </div>
+        <p className="mt-1 text-xs text-slate-500">This matrix reflects all captured records in chronological study flow.</p>
+
+        <div className="mt-2 overflow-x-auto rounded-lg border border-slate-200">
+          <table className="w-full min-w-[900px] border-collapse text-xs">
+            <thead className="bg-slate-50 text-slate-600">
+              <tr>
+                <th className="border border-slate-200 px-2 py-2 text-left">Assessment</th>
+                {DAYS.map((day) => (
+                  <th key={day} className="border border-slate-200 px-2 py-2 text-center">Day {day}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {scheduleActivities.map((activity) => (
+                <tr key={activity}>
+                  <td className="border border-slate-200 px-2 py-2 font-medium text-slate-700">{activity}</td>
+                  {DAYS.map((day) => {
+                    const scheduled = Boolean(MATRIX[activity]?.[day]);
+                    const visitLabel = `Day ${day}`;
+                    const dataCount = scheduleHeatmap.get(`${activity}::${visitLabel}`) ?? 0;
+                    return (
+                      <td key={`${activity}-${day}`} className="border border-slate-200 px-2 py-2 text-center">
+                        {scheduled ? (
+                          <span className={`inline-flex min-w-10 items-center justify-center rounded-full px-2 py-0.5 text-[11px] font-semibold ${dataCount > 0 ? "bg-blue-100 text-blue-800" : "bg-slate-100 text-slate-600"}`}>
+                            {dataCount > 0 ? dataCount : "0"}
+                          </span>
+                        ) : (
+                          <span className="text-slate-300">-</span>
+                        )}
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      )}
+
+      {role !== "DM" && (
+        <div className="mt-3 overflow-x-auto rounded-xl border border-slate-200">
+        <table className="w-full min-w-[980px] border-collapse text-sm">
+          <thead className="bg-slate-50 text-slate-600">
+            <tr>
+              <th className="border border-slate-200 px-3 py-2 text-left">Subject</th>
+              <th className="border border-slate-200 px-3 py-2 text-left">Site</th>
+              <th className="border border-slate-200 px-3 py-2 text-left">Visit</th>
+              <th className="border border-slate-200 px-3 py-2 text-left">Form</th>
+              <th className="border border-slate-200 px-3 py-2 text-left">Field</th>
+              <th className="border border-slate-200 px-3 py-2 text-left">Value</th>
+              <th className="border border-slate-200 px-3 py-2 text-left">Source</th>
+              <th className="border border-slate-200 px-3 py-2 text-left">Query</th>
+              <th className="border border-slate-200 px-3 py-2 text-left">Captured</th>
+            </tr>
+          </thead>
+          <tbody>
+            {allRecords.map((record) => (
+              <Fragment key={record.id}>
+                <tr key={record.id} className="cursor-pointer hover:bg-slate-50" onClick={() => setExpandedRow((prev) => (prev === record.id ? null : record.id))}>
+                  <td className="border border-slate-200 px-3 py-2">{record.subjectId}</td>
+                  <td className="border border-slate-200 px-3 py-2">{record.siteId}</td>
+                  <td className="border border-slate-200 px-3 py-2">{record.visit}</td>
+                  <td className="border border-slate-200 px-3 py-2">{record.formType}</td>
+                  <td className="border border-slate-200 px-3 py-2">{record.fieldLabel}</td>
+                  <td className="border border-slate-200 px-3 py-2">{record.value}</td>
+                  <td className="border border-slate-200 px-3 py-2">
+                    <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${sourceBadge(record.source)}`}>{record.source}</span>
+                  </td>
+                  <td className="border border-slate-200 px-3 py-2">
+                    <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${record.queryStatus === "open" ? "bg-amber-100 text-amber-900" : "bg-emerald-100 text-emerald-800"}`}>
+                      {record.queryStatus === "open" ? "Open" : "Clear"}
+                    </span>
+                  </td>
+                  <td className="border border-slate-200 px-3 py-2">{new Date(record.capturedAt).toLocaleDateString()}</td>
+                </tr>
+                {expandedRow === record.id && (
+                  <tr>
+                    <td colSpan={9} className="border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
+                      <p className="font-semibold">Full Record Details</p>
+                      <p className="mt-1">Subject {record.subjectId} from Site {record.siteId}, {record.formType} ({record.visit})</p>
+                      <p className="mt-1">Field: {record.fieldLabel} | Value: {record.value} | Source: {record.source}</p>
+                      <p className="mt-1">Captured at {new Date(record.capturedAt).toLocaleString()} | Query Status: {record.queryStatus}</p>
+                    </td>
+                  </tr>
+                )}
+              </Fragment>
+            ))}
+            {allRecords.length === 0 && (
+              <tr>
+                <td colSpan={9} className="px-3 py-6 text-center text-sm text-slate-500">No records available.</td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+      )}
+
+      {role === "DM" && (
+        <div className="mt-3 rounded-xl border border-slate-200 p-3">
+          {!dmSubject ? (
+            <p className="mt-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600">No subject data available for DM review yet.</p>
+          ) : (
+            <div className="mt-3 space-y-3">
+              <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                <p className="text-sm font-semibold">Subject Details</p>
+                <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-700">
+                  <span className="font-semibold">{dmSubject.id}</span>
+                  <span>Site Name: <span className="font-semibold">{dmSubjectSite?.name ?? `Site ${dmSubject.siteId}`}</span></span>
+                  <span>Site ID: {dmSubject.siteId}</span>
+                  <span>{dmSubject.region}, {dmSubject.country}</span>
+                </div>
+                {dmSubjectSite && (
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    <label className="inline-flex items-center gap-1 rounded-md border border-slate-300 bg-white px-1.5 py-1 text-[10px]">
+                      <span className="font-semibold text-slate-600">CEC</span>
+                      <select className="max-w-[170px] bg-transparent text-[10px]">
+                        {dmSubjectSite.cecTeam.map((member) => (
+                          <option key={member.email} value={member.email}>{member.name} • {member.email}</option>
+                        ))}
+                      </select>
+                    </label>
+                    <label className="inline-flex items-center gap-1 rounded-md border border-slate-300 bg-white px-1.5 py-1 text-[10px]">
+                      <span className="font-semibold text-slate-600">CRA</span>
+                      <select className="max-w-[170px] bg-transparent text-[10px]">
+                        {dmSubjectSite.craTeam.map((member) => (
+                          <option key={member.email} value={member.email}>{member.name} • {member.email}</option>
+                        ))}
+                      </select>
+                    </label>
+                    <label className="inline-flex items-center gap-1 rounded-md border border-slate-300 bg-white px-1.5 py-1 text-[10px]">
+                      <span className="font-semibold text-slate-600">PI</span>
+                      <select className="max-w-[170px] bg-transparent text-[10px]">
+                        {dmSubjectSite.piTeam.map((member) => (
+                          <option key={member.email} value={member.email}>{member.name} • {member.email}</option>
+                        ))}
+                      </select>
+                    </label>
+                    <label className="inline-flex items-center gap-1 rounded-md border border-slate-300 bg-white px-1.5 py-1 text-[10px]">
+                      <span className="font-semibold text-slate-600">DM</span>
+                      <select className="max-w-[170px] bg-transparent text-[10px]">
+                        {dmSubjectSite.dmTeam.map((member) => (
+                          <option key={member.email} value={member.email}>{member.name} • {member.email}</option>
+                        ))}
+                      </select>
+                    </label>
+                    <label className="inline-flex items-center gap-1 rounded-md border border-slate-300 bg-white px-1.5 py-1 text-[10px]">
+                      <span className="font-semibold text-slate-600">Sponsor</span>
+                      <select className="max-w-[170px] bg-transparent text-[10px]">
+                        {dmSubjectSite.sponsorTeam.map((member) => (
+                          <option key={member.email} value={member.email}>{member.name} • {member.email}</option>
+                        ))}
+                      </select>
+                    </label>
+                  </div>
+                )}
+              </div>
+
+              <div className="rounded-xl border border-slate-200 p-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Visits</p>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {dmVisitSequence.map((visit) => {
+                    const unlocked = isDmVisitUnlocked(dmSubject.id, visit);
+                    const complete = isDmVisitComplete(dmSubject.id, visit);
+                    const hasData = entries.some((entry) => entry.subjectId === dmSubject.id && entry.visit === visit);
+                    const statusClass = complete
+                      ? "border border-emerald-400 bg-emerald-100 text-emerald-900"
+                      : hasData
+                        ? "border border-amber-400 bg-amber-100 text-amber-900"
+                        : "border border-slate-300 bg-white text-slate-700";
+                    const statusLabel = !unlocked ? "Locked" : complete ? "Complete" : hasData ? "Missing" : "Not Touched";
+                    return (
+                      <button
+                        key={visit}
+                        onClick={() => setDmSelectedVisit(visit)}
+                        disabled={!unlocked}
+                        className={`rounded-md px-3 py-1.5 text-sm font-semibold ${statusClass} ${dmSelectedVisit === visit ? "ring-2 ring-blue-500" : ""} ${!unlocked ? "cursor-not-allowed opacity-40" : ""}`}
+                      >
+                        {visit} • {statusLabel}
+                      </button>
+                    );
+                  })}
+                </div>
+                <p className="mt-2 text-xs text-slate-500">Chronological lock: each next visit unlocks only after previous visit forms are completed.</p>
+              </div>
+
+              <div className="grid gap-3 lg:grid-cols-[260px_1fr]">
+                <aside className="rounded-xl border border-slate-200 p-3">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Forms</p>
+                  <div className="mt-2 space-y-2">
+                    {dmScheduledCrfs.map((crfName) => {
+                      const expectedCount = (CRF_FIELD_LIBRARY[crfName] ?? []).length;
+                      const submittedCount = entries.filter((entry) => entry.subjectId === dmSubject.id && entry.visit === dmSelectedVisit && entry.crf === crfName).length;
+                      const complete = expectedCount > 0 ? submittedCount >= expectedCount : submittedCount > 0;
+                      const hasData = submittedCount > 0;
+                      const statusClass = complete
+                        ? "border border-emerald-400 bg-emerald-100 text-emerald-900"
+                        : hasData
+                          ? "border border-amber-400 bg-amber-100 text-amber-900"
+                          : "border border-slate-300 bg-white text-slate-700";
+                      const statusLabel = complete ? "Complete" : hasData ? "Missing" : "Not Touched";
+                      return (
+                        <button
+                          key={crfName}
+                          onClick={() => {
+                            setDmSelectedCrf(crfName);
+                            setDmSelectedField("");
+                          }}
+                          className={`w-full rounded-md px-3 py-2 text-left text-sm font-semibold ${statusClass} ${dmSelectedCrf === crfName ? "ring-2 ring-blue-500" : ""}`}
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <span>{crfName}</span>
+                            <span className="text-[10px] font-semibold">{statusLabel}</span>
+                          </div>
+                        </button>
+                      );
+                    })}
+                    {dmScheduledCrfs.length === 0 && <p className="text-xs text-slate-500">No scheduled forms for {dmSelectedVisit}.</p>}
+                  </div>
+                </aside>
+
+                <div className="rounded-xl border border-slate-200 bg-white p-4">
+                  <h4 className="text-base font-semibold">{dmSelectedCrf || "Select a form"}</h4>
+                  <p className="text-xs text-slate-500">{dmSelectedVisit} review scope</p>
+
+                  {dmSelectedCrf ? (
+                    <div className="mt-3 space-y-2">
+                      {dmExpectedFields.map((fieldLabel) => {
+                        const row = dmFormEntries.find((entry) => entry.fieldLabel === fieldLabel);
+                        return (
+                          <div key={fieldLabel} className="grid gap-2 md:grid-cols-[220px_1fr_130px]">
+                            <button
+                              onClick={() => setDmSelectedField(fieldLabel)}
+                              className={`rounded-md px-2 py-1 text-left text-sm font-medium ${dmSelectedField === fieldLabel ? "bg-violet-100 text-violet-900" : "text-slate-700 hover:bg-slate-100"}`}
+                            >
+                              {fieldLabel}
+                            </button>
+                            <input
+                              value={row?.value ?? ""}
+                              readOnly
+                              className="rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-sm"
+                              placeholder="No data entered"
+                            />
+                            <span className={`inline-flex items-center justify-center rounded-md px-2 py-1 text-xs font-semibold ${row ? "bg-emerald-100 text-emerald-800" : "bg-slate-100 text-slate-700"}`}>
+                              {row ? "Submitted" : "Pending"}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <p className="mt-3 text-sm text-slate-500">Select a form from the left panel.</p>
+                  )}
+
+                  <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Inspection Console</p>
+                      <span className="text-xs text-slate-500">{dmSelectedField ? `Field: ${dmSelectedField}` : "Form Scope"}</span>
+                    </div>
+                    <p className="mt-1 text-sm font-semibold">{dmSelectedCrf || "Form"} • {dmSelectedVisit}</p>
+
+                    <div className="mt-2 grid gap-3 lg:grid-cols-2">
+                      <div>
+                        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Submitted Values</p>
+                        <ul className="mt-1 space-y-1 text-xs">
+                          {dmScopedEntries.map((entry) => (
+                            <li key={entry.id} className="rounded-md border border-slate-200 bg-white px-2 py-1">
+                              {entry.fieldLabel}: <span className="font-semibold">{entry.value}</span> • {entry.enteredByRole} • {new Date(entry.enteredAt).toLocaleString()}
+                            </li>
+                          ))}
+                          {dmScopedEntries.length === 0 && <li className="text-slate-500">No submitted data in this scope yet.</li>}
+                        </ul>
+                      </div>
+                      <div>
+                        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Audit Trail For Selected Scope</p>
+                        <ul className="mt-1 max-h-44 space-y-1 overflow-auto pr-1 text-xs">
+                          {dmScopedAuditLogs.map((log) => (
+                            <li key={log.id} className="rounded-md border border-slate-200 bg-white px-2 py-1">
+                              <p className="font-medium">{log.action}</p>
+                              <p className="text-[11px] text-slate-500">{log.by} • {new Date(log.timestamp).toLocaleString()}</p>
+                            </li>
+                          ))}
+                          {dmScopedAuditLogs.length === 0 && <li className="text-slate-500">No audit events for current scope.</li>}
+                        </ul>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </>
+  );
+}
+
 function StatCard({ label, value, icon }: { label: string; value: string; icon: React.ReactNode }) {
   return (
     <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
       <div className="mb-1 inline-flex rounded-md bg-white p-1 text-slate-700">{icon}</div>
       <p className="text-xs font-semibold uppercase text-slate-500">{label}</p>
       <p className="text-xl font-semibold">{value}</p>
+    </div>
+  );
+}
+
+function Phase2ReportingView({
+  project,
+  finalizedCrfs,
+  entries,
+}: {
+  project: Project | null;
+  finalizedCrfs: CrfRow[];
+  entries: DataEntryRecord[];
+}) {
+  const [reportName, setReportName] = useState("Clinical Data Listing");
+  const [reportType, setReportType] = useState("Subject Listing");
+  const [groupBy, setGroupBy] = useState("Visit");
+  const [selectedColumns, setSelectedColumns] = useState<Array<{ crf: string; field: string; type: CrfFieldType }>>([]);
+  const [dragOver, setDragOver] = useState(false);
+
+  const crfFieldLibrary = useMemo(() => {
+    const map = new Map<string, Array<{ field: string; type: CrfFieldType }>>();
+    finalizedCrfs.forEach((row) => {
+      const existing = map.get(row.label) ?? [];
+      if (!existing.some((item) => item.field === row.fieldLabel)) {
+        existing.push({ field: row.fieldLabel, type: row.fieldType });
+      }
+      map.set(row.label, existing);
+    });
+    return Array.from(map.entries()).map(([crf, fields]) => ({ crf, fields }));
+  }, [finalizedCrfs]);
+
+  const reportPreviewRows = useMemo(() => {
+    if (selectedColumns.length === 0) return [] as Array<Record<string, string>>;
+    const grouped = new Map<string, Record<string, string>>();
+
+    entries.forEach((entry) => {
+      const key = `${entry.subjectId}::${entry.visit}`;
+      const record = grouped.get(key) ?? {
+        Subject: entry.subjectId,
+        Visit: entry.visit,
+        CRF: entry.crf,
+      };
+      const matchedColumn = selectedColumns.find((column) => column.crf === entry.crf && column.field === entry.fieldLabel);
+      if (matchedColumn) {
+        record[`${matchedColumn.crf} • ${matchedColumn.field}`] = entry.value;
+      }
+      grouped.set(key, record);
+    });
+
+    return Array.from(grouped.values()).slice(0, 50);
+  }, [entries, selectedColumns]);
+
+  const stats = useMemo(() => {
+    const formCount = new Set(entries.map((entry) => `${entry.subjectId}::${entry.visit}::${entry.crf}`)).size;
+    const subjectCount = new Set(entries.map((entry) => entry.subjectId)).size;
+    const openQueries = entries.filter((entry) => entry.status === "queried").length;
+    return {
+      subjects: subjectCount,
+      forms: formCount,
+      openQueries,
+      selectedColumns: selectedColumns.length,
+    };
+  }, [entries, selectedColumns]);
+
+  const onDropColumn = (payloadRaw: string) => {
+    try {
+      const payload = JSON.parse(payloadRaw) as { crf: string; field: string; type: CrfFieldType };
+      setSelectedColumns((prev) => {
+        if (prev.some((column) => column.crf === payload.crf && column.field === payload.field)) {
+          return prev;
+        }
+        return [...prev, payload];
+      });
+    } catch {
+      // Ignore invalid drag payloads in prototype mode.
+    }
+  };
+
+  const applyTemplate = (template: "cleaning" | "safety" | "visit") => {
+    const templateColumns: Record<"cleaning" | "safety" | "visit", string[]> = {
+      cleaning: ["Demographics::Gender", "Demographics::Ethnicity", "Vital Signs::Systolic Blood Pressure"],
+      safety: ["Adverse Events::AE Term", "Adverse Events::Severity", "Medical History::Condition"],
+      visit: ["Informed Consent::Consent Obtained", "Informed Consent::Consent Date", "Vital Signs::Heart Rate"],
+    };
+
+    const target = templateColumns[template];
+    const flattened = crfFieldLibrary.flatMap((crf) =>
+      crf.fields.map((field) => ({ crf: crf.crf, field: field.field, type: field.type })),
+    );
+
+    setSelectedColumns(
+      flattened.filter((item) => target.includes(`${item.crf}::${item.field}`)),
+    );
+  };
+
+  const exportCsv = () => {
+    const columns = ["Subject", "Visit", "CRF", ...selectedColumns.map((column) => `${column.crf} • ${column.field}`)];
+    const rows = reportPreviewRows.map((row) =>
+      columns
+        .map((column) => `"${String(row[column] ?? "").replace(/"/g, '""')}"`)
+        .join(","),
+    );
+    const csv = [columns.join(","), ...rows].join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = `${(reportName || "Report").replace(/\s+/g, "_")}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const exportPdf = () => {
+    const win = window.open("", "_blank", "width=1200,height=800");
+    if (!win) return;
+    win.document.write(`
+      <html><head><title>${reportName}</title></head>
+      <body style="font-family: 'Times New Roman', serif; padding: 20px;">
+        <h1>${reportName}</h1>
+        <p><b>Study:</b> ${project?.title ?? "Current Study"}</p>
+        <p><b>Type:</b> ${reportType} | <b>Group By:</b> ${groupBy}</p>
+        <table border="1" cellspacing="0" cellpadding="6" style="border-collapse: collapse; width: 100%; margin-top: 12px;">
+          <thead><tr>${["Subject", "Visit", "CRF", ...selectedColumns.map((column) => `${column.crf} • ${column.field}`)].map((header) => `<th>${header}</th>`).join("")}</tr></thead>
+          <tbody>
+            ${reportPreviewRows
+              .map((row) => {
+                const cells = ["Subject", "Visit", "CRF", ...selectedColumns.map((column) => `${column.crf} • ${column.field}`)]
+                  .map((key) => `<td>${row[key] ?? ""}</td>`)
+                  .join("");
+                return `<tr>${cells}</tr>`;
+              })
+              .join("")}
+          </tbody>
+        </table>
+      </body></html>
+    `);
+    win.document.close();
+    win.focus();
+    win.print();
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-start justify-between gap-3 rounded-xl border border-slate-200 bg-white p-4">
+        <div>
+          <h3 className="text-xl font-semibold">Reporting Module</h3>
+          <p className="mt-1 text-sm text-slate-600">Build project-specific clinical reports using drag-and-drop CRF fields from finalized study forms.</p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <button onClick={() => applyTemplate("cleaning")} className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700">Template: Data Cleaning</button>
+          <button onClick={() => applyTemplate("safety")} className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700">Template: Safety</button>
+          <button onClick={() => applyTemplate("visit")} className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700">Template: Visit Readiness</button>
+        </div>
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <StatCard label="Subjects" value={String(stats.subjects)} icon={<Users size={18} />} />
+        <StatCard label="Forms Captured" value={String(stats.forms)} icon={<ClipboardList size={18} />} />
+        <StatCard label="Open Queries" value={String(stats.openQueries)} icon={<Info size={18} />} />
+        <StatCard label="Report Columns" value={String(stats.selectedColumns)} icon={<Table size={18} />} />
+      </div>
+
+      <div className="grid gap-4 xl:grid-cols-[320px_1fr]">
+        <aside className="rounded-xl border border-slate-200 bg-white p-3">
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Project CRF Library</p>
+          <p className="mt-1 text-xs text-slate-500">Drag any CRF field into Report Canvas to include it in extraction.</p>
+          <div className="mt-3 max-h-[520px] space-y-3 overflow-auto pr-1">
+            {crfFieldLibrary.map((crf) => (
+              <div key={crf.crf} className="rounded-lg border border-slate-200 bg-slate-50 p-2">
+                <p className="text-sm font-semibold text-slate-800">{crf.crf}</p>
+                <div className="mt-2 flex flex-wrap gap-1">
+                  {crf.fields.map((field) => (
+                    <button
+                      key={`${crf.crf}-${field.field}`}
+                      draggable
+                      onDragStart={(event) => {
+                        event.dataTransfer.setData(
+                          "application/json",
+                          JSON.stringify({ crf: crf.crf, field: field.field, type: field.type }),
+                        );
+                      }}
+                      className="cursor-grab rounded-full border border-slate-300 bg-white px-2 py-1 text-[11px] font-semibold text-slate-700 hover:border-blue-300 hover:text-blue-700"
+                    >
+                      {field.field}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ))}
+            {crfFieldLibrary.length === 0 && (
+              <p className="rounded-md border border-amber-200 bg-amber-50 px-2 py-2 text-xs text-amber-900">No finalized CRFs found. Finalize CRFs in Phase 1 to build reports.</p>
+            )}
+          </div>
+        </aside>
+
+        <div className="space-y-3">
+          <div className="rounded-xl border border-slate-200 bg-white p-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Report Configuration</p>
+            <div className="mt-2 grid gap-2 md:grid-cols-3">
+              <input value={reportName} onChange={(event) => setReportName(event.target.value)} className="rounded-md border border-slate-300 px-3 py-2 text-sm" placeholder="Report Name" />
+              <select value={reportType} onChange={(event) => setReportType(event.target.value)} className="rounded-md border border-slate-300 px-3 py-2 text-sm">
+                {["Subject Listing", "Operational Report", "Data Cleaning Report", "Safety Snapshot"].map((type) => (
+                  <option key={type} value={type}>{type}</option>
+                ))}
+              </select>
+              <select value={groupBy} onChange={(event) => setGroupBy(event.target.value)} className="rounded-md border border-slate-300 px-3 py-2 text-sm">
+                {["Visit", "Site", "CRF", "Subject"].map((group) => (
+                  <option key={group} value={group}>{group}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div
+            onDragOver={(event) => {
+              event.preventDefault();
+              setDragOver(true);
+            }}
+            onDragLeave={() => setDragOver(false)}
+            onDrop={(event) => {
+              event.preventDefault();
+              setDragOver(false);
+              onDropColumn(event.dataTransfer.getData("application/json"));
+            }}
+            className={`rounded-xl border-2 border-dashed p-4 ${dragOver ? "border-blue-500 bg-blue-50" : "border-slate-300 bg-slate-50"}`}
+          >
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="text-sm font-semibold text-slate-800">Report Canvas (Drag & Drop)</p>
+              <button onClick={() => setSelectedColumns([])} className="rounded-md border border-slate-300 bg-white px-2 py-1 text-xs font-semibold text-slate-700">Clear</button>
+            </div>
+            <div className="mt-2 flex min-h-20 flex-wrap gap-2 rounded-lg border border-slate-200 bg-white p-2">
+              {selectedColumns.map((column) => (
+                <span key={`${column.crf}-${column.field}`} className="rounded-full border border-blue-200 bg-blue-50 px-2 py-1 text-xs font-semibold text-blue-800">
+                  {column.crf} • {column.field}
+                </span>
+              ))}
+              {selectedColumns.length === 0 && <p className="text-xs text-slate-500">Drop CRF fields here to define report columns.</p>}
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-slate-200 bg-white p-3">
+            <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+              <p className="text-sm font-semibold text-slate-800">Report Preview</p>
+              <div className="flex flex-wrap gap-2">
+                <button onClick={exportCsv} className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700">Export CSV</button>
+                <button onClick={exportPdf} className="rounded-md bg-red-600 px-3 py-1.5 text-xs font-semibold text-white">Export PDF</button>
+              </div>
+            </div>
+            <div className="overflow-x-auto rounded-lg border border-slate-200">
+              <table className="w-full min-w-[840px] border-collapse text-xs">
+                <thead className="bg-slate-50 text-slate-600">
+                  <tr>
+                    <th className="border border-slate-200 px-2 py-2 text-left">Subject</th>
+                    <th className="border border-slate-200 px-2 py-2 text-left">Visit</th>
+                    <th className="border border-slate-200 px-2 py-2 text-left">CRF</th>
+                    {selectedColumns.map((column) => (
+                      <th key={`${column.crf}-${column.field}`} className="border border-slate-200 px-2 py-2 text-left">
+                        {column.crf} • {column.field}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {reportPreviewRows.map((row, idx) => (
+                    <tr key={`preview-${idx}`}>
+                      <td className="border border-slate-200 px-2 py-2">{row.Subject ?? ""}</td>
+                      <td className="border border-slate-200 px-2 py-2">{row.Visit ?? ""}</td>
+                      <td className="border border-slate-200 px-2 py-2">{row.CRF ?? ""}</td>
+                      {selectedColumns.map((column) => (
+                        <td key={`${idx}-${column.crf}-${column.field}`} className="border border-slate-200 px-2 py-2">
+                          {row[`${column.crf} • ${column.field}`] ?? "-"}
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                  {reportPreviewRows.length === 0 && (
+                    <tr>
+                      <td colSpan={3 + selectedColumns.length} className="px-3 py-6 text-center text-xs text-slate-500">
+                        No preview rows yet. Add columns and ensure data is entered in Phase 2.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

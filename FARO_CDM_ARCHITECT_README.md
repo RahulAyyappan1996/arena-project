@@ -38,6 +38,17 @@ Act as a Senior Clinical Data Management (CDM) Architect and Lead Software Engin
 - TMF is study-scoped: each study has its own TMF repository and signature workflow.
 - TMF repository includes a Study Name column for clarity across studies.
 - Phase 2 includes role-aware Data Entry Portal:
-  - Site roles (CRA/PI/CRC): create entries.
-  - DM/Sponsor: review entries and mark reviewed or queried.
+  - Site roles (CRA/CRC): create entries.
+  - PI/DM/Sponsor: review visibility and oversight actions.
   - All key actions append to audit trail.
+- Subject enrollment is also restricted to CRA/CRC.
+- DM review should support chronological visit/form inspection flow.
+- Query workflows should support realistic lifecycle states, timestamps, and role reassignment.
+
+## Instruction Priority
+When design requests conflict, prioritize in this order:
+1. Regulatory integrity and traceability
+2. Clinical workflow realism
+3. Role-based access correctness
+4. High-density usability for CDM teams
+5. Visual polish

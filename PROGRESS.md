@@ -1,91 +1,80 @@
 # PROGRESS
 
 ## Current Build Status
-- Lifecycle app restored and aligned with requested sequence.
-- FARO workspace integrated under Setup Phase after protocol ingestion.
-- UI is clickable with static data and route-like state changes.
+- Build is green and functional (`npm run build` passes).
+- Full 6-step lifecycle exists with FARO embedded in Setup Phase.
+- Command-center style navigation, DataHub, QueryManager, TMF, and role-gated Phase 2 flows are active.
 
-## Completed Items
-- Gateway with environment selection (UAT / Production)
-- Project Hub with enrolled projects and create-project flow
-- Setup Phase with protocol ingestion and FARO workspace entry
-- FARO screens:
-  - General Info
-  - Schedule of Activities (clickable matrix)
-  - Activity Configuration
-  - Insights
-  - Case Report Form Manager
-- AI Edit Checks stage with approve/reject workflow
-- AI edit checks upgraded to CRF-driven rule generation
-- AI edit checks renamed to `AI-Driven Edit Checks & Custom functions`
-- Custom rule creation per CRF via `+ Add Check`
-- Cross-form custom function builder added (power-query style)
-- TMF stage with document generation view + sign-off gate
-- Phase 2 live view with role switch and dummy patient enrollment
-- CRF Manager updated with field metadata capture (`field label` + `field type`)
-- CRF Manager expanded with controlled value support (`allowed values`, `allow other`)
-- CRF templates generated from FARO Study Definition workspace (field-level)
-- Demographics template now includes protocol-style fields (Gender, Ethnicity, Date of Birth)
-- CRF Manager refactored to CRF-first flow:
-  - choose/create CRF
-  - add field list with format and codelist settings
-  - finalize CRF for schedule availability
-- Schedule of Activities now only lists finalized CRFs from CRF Manager
-- CRF view now renders as multi-level CRF -> fields structure to reduce duplicate form-name repetition
-- Edit Checks composer upgraded with:
-  - Formula entry (`@Field +/-/* @OtherField`)
-  - Plain-English AI draft input
-  - CRF-grouped field selection across finalized forms
-- Custom Function composer now supports >2 form comparisons using `+ Add Form`
-- AI Align All now auto-populates the full predefined CRF library and opens CRF Manager for final field-format review
-- Edit Checks composer now supports explicit CRF selection for rule target before field logic selection
-- Edit Checks now supports bulk workflow: Select All, Clear Selection, and Approve Selected
-- Added `AI Align All` control inside `AI-Driven Edit Checks & Custom functions`
-- Added TMF document package generator with broader artifact coverage:
-  - Study setup configuration
-  - Protocol synopsis/amendment log
-  - CRF config + aCRF + CRF instructions
-  - Edit check + custom function specs
-  - DMP + SAP
-  - Metadata spec + metadata traceability map (CDASH->SDTM->ADaM->TLF)
-  - SDTM/ADaM specs, TLF shells, Define.xml + reviewer guides
-- Added assign-to-TMF workflow per document and bulk assign option
-- Added separate TMF landing behavior with repository table and signature queue
-- Added document preview/sign workflow with:
-  - Digital signature
-  - Print preview
-  - Wet-ink upload submit
-- Added go-live gate: Phase 2 unlocks only when all assigned documents are signed
-- Added dashboard visibility for user-specific pending signature tasks via login email
-- Added study-scoped TMF repositories (documents now separated by study)
-- Added Study Name column in TMF repository table
-- Added study selector inside TMF page to switch study repositories
-- Added Phase 2 role `Sponsor` for oversight workflows
-- Added role-based Data Entry Portal in Phase 2:
-  - Site roles (CRA/PI/CRC) submit entries
-  - DM/Sponsor review entries and mark reviewed or queried
-- Added audit trail feed for enrollment/data-entry/review actions
-- Added permanent operating charter file: `FARO_CDM_ARCHITECT_README.md`
+## Major Completed Workstreams
 
-## Known Operational Risk
-- Hosted previews (Arena/Vercel) may show stale UI if old workspace/build is still active.
+### Lifecycle And Navigation
+- Login with environment selection and persistent badge.
+- Project hub with enrolled projects and create flow.
+- Sequential routing: Setup -> Edit Checks -> TMF -> Phase 2.
+- Home navigation via clickable ClearTrial logo.
+
+### FARO Study Build
+- Protocol ingestion gate before FARO workspace.
+- FARO modules include General Info, Objectives, Population, Study Design, Schedule, CRF Manager, Compare, Insights.
+- CRF-first workflow implemented and linked to schedule availability.
+
+### Edit Checks Platform
+- Renamed to `AI-Driven Edit Checks & Custom functions`.
+- CRF-aware suggestions from finalized forms.
+- Edit Check and Custom Function drafting.
+- Formula and plain-English draft support.
+- Multi-form comparisons with `+ Add Form`.
+- Bulk rule approval actions.
+- AI Align All present in this stage.
+
+### TMF Portal
+- Study-specific TMF repositories with Study Name column.
+- Rich document package generation and assign-to-TMF workflow.
+- Signature queue by logged-in user.
+- Preview, digital sign, print, upload signed copy.
+- Go-live gating on complete signatures.
+
+### Phase 2 Execution
+- Strict role controls:
+  - Subject Enrollment: CRA/CRC only.
+  - Data Entry: CRA/CRC only.
+  - Review visibility: DM/PI/Sponsor.
+- Site-style chronological visit/form data entry with lock sequence.
+- Form and visit statuses, inspection console, and audit trail.
+- CRA controlled edit/resubmit behavior for submitted CRFs.
+- Subject ID auto-sequencing by site format (`001-001`, `001-002`).
+
+### DataHub And Query Operations
+- DataHub added in Phase 2 navigation with aggregated records and exports.
+- DM-focused chronological view restored and prioritized.
+- QueryManager added with realistic status lifecycle, filters, aging, bulk actions, and detail thread.
+
+### Intelligence
+- Faro Predict module integrated under `Insights & Faro Predict`.
+- Hypothesis input, pre-sim interview, swarm log, projection panel, and knowledge graph explorer.
+
+### UI System Updates
+- Global dark/light mode with manual and scheduled behavior.
+- Header/top stripe and command-center visual refinements.
+- Global font set to Times New Roman.
+
+## Known Risk
+- Arena preview can serve stale workspace/build.
 - Mitigation:
-  - Confirm `src/main.tsx` imports `./App`
-  - Rebuild and restart preview
-  - Hard refresh browser
+  - verify `src/main.tsx` imports `./App`
+  - rebuild and restart preview
+  - hard refresh browser cache
 
-## Verification Checklist (Use Per Deployment)
-- Login appears first
-- Project Hub appears after sign-in
-- FARO appears only after ingestion in setup
-- Edit Checks follows setup approval
-- TMF follows edit check finalization
-- Phase 2 unlocks only after sign-off
-- TMF shows study-scoped documents and Study Name column
-- Site role can submit data entries and DM/Sponsor can review/query those entries
+## Deployment Verification Checklist
+- Login appears first.
+- FARO appears only after protocol ingestion in Setup.
+- Edit Checks and TMF follow sequence and gates.
+- Phase 2 only after TMF sign completion.
+- TMF is study-scoped and includes Study Name column.
+- Enrollment and data entry tabs are visible only to CRA/CRC.
+- DM sees chronological review in DataHub.
 
-## Next Suggested Iterations
-- Add visible version marker in UI header for deployment sanity check
-- Split monolithic app shell into `src/views/*` for maintainability
-- Add local persistence (optional) for prototype sessions
-- Expand field libraries for additional therapeutic areas beyond current baseline set
+## Next Candidate Iterations
+- Add version watermark/badge for deployment certainty.
+- Split `src/App.tsx` into modular views/components.
+- Add persistence layer option (Supabase/local mock persistence toggle).

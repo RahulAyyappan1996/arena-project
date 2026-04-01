@@ -9,6 +9,11 @@ import type { AgentLogMessage, ContextQuestion } from "./FaroPredict.types";
 
 const CONTEXT_QUESTIONS: ContextQuestion[] = [
   {
+    id: "priorityMode",
+    label: "I detected a 20% dropout risk in rural sites. Should I prioritize cost or speed in this simulation?",
+    options: ["Prioritize Cost", "Prioritize Speed", "Balanced"],
+  },
+  {
     id: "siteBurden",
     label: "Specify Site Burden Level",
     options: ["Low", "Medium", "High"],
@@ -140,7 +145,7 @@ export default function FaroPredict() {
         id: "intro",
         agent: "System",
         tone: "neutral",
-        text: `Scenario accepted. Site burden=${answers.siteBurden}, dropout risk=${answers.patientRisk}, regulatory tolerance=${answers.regulatoryTolerance}. Initializing swarm...`,
+        text: `Scenario accepted. Priority=${answers.priorityMode}, site burden=${answers.siteBurden}, dropout risk=${answers.patientRisk}, regulatory tolerance=${answers.regulatoryTolerance}. Initializing swarm...`,
         probabilityDelta: 0,
         completionDeltaDays: 0,
       },
@@ -198,7 +203,7 @@ export default function FaroPredict() {
           onChange={(e) => setHypothesis(e.target.value)}
           rows={4}
           className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-blue-500"
-          placeholder="If we reduce the dosage by 10mg, what is the impact on efficacy vs. dropout?"
+          placeholder="What if we change [Variable]?"
         />
         <div className="mt-3 flex items-center justify-between">
           <p className="text-xs text-slate-500">The model asks contextual pre-check questions before simulation.</p>
