@@ -1612,6 +1612,30 @@ export default function App() {
         showTrigger={false}
       />
 
+      <footer className={`border-t py-4 px-6 mt-10 transition-colors ${isDarkMode ? "border-slate-800 bg-slate-950 text-slate-400" : "border-slate-200 bg-white text-slate-500"}`}>
+        <div className="mx-auto max-w-7xl flex flex-col md:flex-row items-center justify-between gap-4">
+          <div className="flex flex-col items-center md:items-start gap-1">
+            <p className="text-xs font-semibold tracking-wide uppercase">© 2026 ClearTrial. All rights reserved.</p>
+            <p className="text-[10px] opacity-75">Proprietary Technology & IP Protected</p>
+          </div>
+          
+          <a 
+            href="https://www.linkedin.com/in/rahulayyappan/" 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className={`group inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-bold transition-all transform hover:scale-105 active:scale-95 ${
+              isDarkMode 
+                ? "bg-blue-600 text-white hover:bg-blue-500 shadow-lg shadow-blue-900/20" 
+                : "bg-slate-900 text-white hover:bg-slate-800 shadow-md"
+            }`}
+          >
+            <svg className="h-4 w-4 fill-current transition-transform group-hover:rotate-12" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.79-1.75-1.764s.784-1.764 1.75-1.764 1.75.79 1.75 1.764-.783 1.764-1.75 1.764zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z"/>
+            </svg>
+            Built by Rahul Ayyappan
+          </a>
+        </div>
+      </footer>
     </div>
   );
 }
@@ -1805,6 +1829,25 @@ function LoginView({
         >
           Sign In
         </button>
+
+        <div className="mt-8 pt-6 border-t border-slate-100 flex flex-col items-center gap-4">
+          <div className="text-center">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">© 2026 ClearTrial. All rights reserved.</p>
+            <p className="text-[10px] text-slate-400">IP SECURED & MAPPED</p>
+          </div>
+          
+          <a 
+            href="https://www.linkedin.com/in/rahulayyappan/" 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="group flex items-center gap-2 rounded-full bg-slate-900 border border-slate-700 px-4 py-2 text-xs font-bold text-white transition-all hover:bg-slate-800 hover:scale-105 active:scale-95 shadow-lg shadow-slate-200"
+          >
+            <svg className="h-4 w-4 fill-current group-hover:rotate-12 transition-transform" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.79-1.75-1.764s.784-1.764 1.75-1.764 1.75.79 1.75 1.764-.783 1.764-1.75 1.764zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z"/>
+            </svg>
+            Built by Rahul Ayyappan
+          </a>
+        </div>
       </div>
     </div>
   );

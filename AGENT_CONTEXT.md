@@ -67,3 +67,9 @@ FARO is embedded inside Step 3 and must not replace lifecycle navigation.
 - Keep all interactions mock-data driven unless user asks for backend.
 - Keep flows deterministic and clickable for demos.
 - Preserve clinical traceability mindset (Part 11 style auditability) in UX.
+
+## Operational Memory (Advanced Frameworks)
+- **Global Conventions**: See [CLAUDE.md](file:///c:/Users/Provi/.antigravity/arena-project/CLAUDE.md) for naming rules, design system, and memory layer definitions (Inspired by Claude Code).
+- **Agency Manifest**: See [.agents/AGENTS.md](file:///c:/Users/Provi/.antigravity/arena-project/.agents/AGENTS.md) for detailed persona instructions, ADR workflows, and "Agent Loop" coordination (Inspired by Agency-Agents & GodMod3).
+- **ADRs**: Major architectural changes must be recorded as Architectural Decision Records.
+- **Agent Loop**: Every major feature request should trigger the PM -> Tension Builder -> Architect -> AI Engineer -> Dev -> Reality Checker loop.
