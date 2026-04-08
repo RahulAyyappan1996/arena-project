@@ -402,6 +402,71 @@ export default function QueryManager({ onCloseForReadiness }: Props) {
     setSelectedIds([]);
   };
 
+  const autoCloseEligible = () => {
+    const eligible = queryRows.filter((row) => {
+      const age = ageInDays(row.createdDate);
+      return row.status === "pending" && row.responses.length > 0 && age > 3;
+    });
+    return eligible.length;
+  };
+
+  const runAutoClose = () => {
+    const eligible = queryRows.filter((row) => {
+      const age = ageInDays(row.createdDate);
+      return row.status === "pending" && row.responses.length > 0 && age > 3;
+    });
+
+    if (eligible.length === 0) return;
+
+    setQueryRows((prev) =>
+      prev.map((row) => {
+        const isEligible = eligible.some((r) => r.id === row.id);
+        if (!isEligible) return row;
+
+        return {
+          ...row,
+          status: "closed" as QueryStatus,
+          responses: [
+            ...row.responses,
+            {
+              id: `AUTO-${Date.now()}-${row.id}`,
+              by: "Auto-Close System",
+              role: "DM",
+              message: "Automatically closed: pending for >3 days with response.",
+              timestamp: new Date().toISOString(),
+            },
+          ],
+        };
+      })
+    );
+    onCloseForReadiness?.(eligible.length);
+  };
+
+  const runBulkEscalate = () => {
+    if (selectedIds.length === 0) return;
+    setQueryRows((prev) =>
+      prev.map((row) => {
+        if (!selectedIds.includes(row.id)) return row;
+        if (row.status === "escalated") return row;
+        return {
+          ...row,
+          status: "escalated" as QueryStatus,
+          responses: [
+            ...row.responses,
+            {
+              id: `ESC-${Date.now()}-${row.id}`,
+              by: "Bulk Action",
+              role: "DM",
+              message: "Escalated via bulk action for urgent review.",
+              timestamp: new Date().toISOString(),
+            },
+          ],
+        };
+      })
+    );
+    setSelectedIds([]);
+  };
+
   const exportVisible = () => {
     const lines = [
       ["Query ID", "Subject", "CRF Field", "Query Text", "Status", "Age (days)", "Assigned To", "Created Date", "Source"].join(","),
@@ -503,6 +568,7 @@ export default function QueryManager({ onCloseForReadiness }: Props) {
         <SummaryCard label="Pending Response" value={summary.pending} tone="amber" />
         <SummaryCard label="Closed Today" value={summary.closedToday} tone="emerald" />
         <SummaryCard label="Overdue (>7d)" value={summary.overdue} tone="violet" />
+        <SummaryCard label="Auto-Close Eligible" value={autoCloseEligible()} tone="emerald" />
       </div>
 
       <div className="grid gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3 lg:grid-cols-4">
@@ -543,7 +609,15 @@ export default function QueryManager({ onCloseForReadiness }: Props) {
             <button onClick={runBulkReassign} className="rounded-md bg-blue-600 px-2 py-1.5 text-xs font-semibold text-white">Reassign</button>
           </div>
         </div>
+        <button onClick={runBulkEscalate} className="rounded-md bg-orange-600 px-2 py-1.5 text-xs font-semibold text-white">Escalate ({selectedIds.filter(id => queryRows.find(q => q.id === id)?.status !== "escalated").length})</button>
         <button onClick={runBulkClose} className="rounded-md bg-emerald-600 px-2 py-1.5 text-xs font-semibold text-white">Close Selected ({selectedIds.length})</button>
+        <button 
+          onClick={runAutoClose} 
+          disabled={autoCloseEligible() === 0}
+          className="rounded-md bg-violet-600 px-2 py-1.5 text-xs font-semibold text-white disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          Auto-Close Eligible ({autoCloseEligible()})
+        </button>
       </div>
 
       <div className="overflow-x-auto rounded-xl border border-slate-200">

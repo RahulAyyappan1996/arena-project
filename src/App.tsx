@@ -29,8 +29,17 @@ import {
 import simulationData from "./components/faro-predict/faro-simulation-data.json";
 const FaroPredict = lazy(() => import("./components/faro-predict/FaroPredict"));
 const QueryManager = lazy(() => import("./components/QueryManager"));
+const ESource = lazy(() => import("./components/eSource/eSource"));
+const SDV = lazy(() => import("./components/sdv/sdv"));
+const MedicalCoding = lazy(() => import("./components/medicalCoding/medicalCoding"));
+const DataLock = lazy(() => import("./components/dataLock/dataLock"));
+const MultiSourceData = lazy(() => import("./components/multiSourceData/multiSourceData"));
+const AutomatedReconciliation = lazy(() => import("./components/automatedReconciliation/automatedReconciliation"));
+const StudyHealthDashboards = lazy(() => import("./components/studyHealthDashboards/studyHealthDashboards"));
+const ChangeDetection = lazy(() => import("./components/changeDetection/changeDetection"));
+const ComplianceAudit = lazy(() => import("./components/complianceAudit/complianceAudit"));
 
-type AppView = "login" | "dashboard" | "faro" | "editchecks" | "tmf" | "phase2";
+type AppView = "login" | "dashboard" | "faro" | "editchecks" | "tmf" | "phase2" | "esource" | "sdv" | "medicalcoding" | "datalock" | "multisourcedata" | "automatedreconciliation" | "studyhealthdashboards" | "changedetection" | "complianceaudit";
 type EnvironmentType = "uat" | "production";
 type ProjectStatus = "setup" | "pending" | "live";
 type Phase2Role = "CRA" | "DM" | "PI" | "CRC" | "Sponsor";
@@ -1477,6 +1486,114 @@ export default function App() {
               </button>
               <button
                 onClick={() => {
+                  setView("esource");
+                }}
+                className={`rounded-full border px-3 py-1 text-xs font-semibold shadow-sm backdrop-blur ${
+                  isDarkMode
+                    ? "border-violet-700 bg-violet-900/45 text-violet-100 hover:bg-violet-900/65"
+                    : "border-violet-200 bg-white/85 text-violet-800 hover:bg-white"
+                }`}
+              >
+                eSource
+              </button>
+              <button
+                onClick={() => {
+                  setView("sdv");
+                }}
+                className={`rounded-full border px-3 py-1 text-xs font-semibold shadow-sm backdrop-blur ${
+                  isDarkMode
+                    ? "border-violet-700 bg-violet-900/45 text-violet-100 hover:bg-violet-900/65"
+                    : "border-violet-200 bg-white/85 text-violet-800 hover:bg-white"
+                }`}
+              >
+                SDV
+              </button>
+              <button
+                onClick={() => {
+                  setView("medicalcoding");
+                }}
+                className={`rounded-full border px-3 py-1 text-xs font-semibold shadow-sm backdrop-blur ${
+                  isDarkMode
+                    ? "border-violet-700 bg-violet-900/45 text-violet-100 hover:bg-violet-900/65"
+                    : "border-violet-200 bg-white/85 text-violet-800 hover:bg-white"
+                }`}
+              >
+                Medical Coding
+              </button>
+              <button
+                onClick={() => {
+                  setView("datalock");
+                }}
+                className={`rounded-full border px-3 py-1 text-xs font-semibold shadow-sm backdrop-blur ${
+                  isDarkMode
+                    ? "border-violet-700 bg-violet-900/45 text-violet-100 hover:bg-violet-900/65"
+                    : "border-violet-200 bg-white/85 text-violet-800 hover:bg-white"
+                }`}
+              >
+                Data Lock
+              </button>
+              <button
+                onClick={() => {
+                  setView("multisourcedata");
+                }}
+                className={`rounded-full border px-3 py-1 text-xs font-semibold shadow-sm backdrop-blur ${
+                  isDarkMode
+                    ? "border-violet-700 bg-violet-900/45 text-violet-100 hover:bg-violet-900/65"
+                    : "border-violet-200 bg-white/85 text-violet-800 hover:bg-white"
+                }`}
+              >
+                Multi-Source Data
+              </button>
+              <button
+                onClick={() => {
+                  setView("automatedreconciliation");
+                }}
+                className={`rounded-full border px-3 py-1 text-xs font-semibold shadow-sm backdrop-blur ${
+                  isDarkMode
+                    ? "border-violet-700 bg-violet-900/45 text-violet-100 hover:bg-violet-900/65"
+                    : "border-violet-200 bg-white/85 text-violet-800 hover:bg-white"
+                }`}
+              >
+                Reconciliation
+              </button>
+              <button
+                onClick={() => {
+                  setView("studyhealthdashboards");
+                }}
+                className={`rounded-full border px-3 py-1 text-xs font-semibold shadow-sm backdrop-blur ${
+                  isDarkMode
+                    ? "border-violet-700 bg-violet-900/45 text-violet-100 hover:bg-violet-900/65"
+                    : "border-violet-200 bg-white/85 text-violet-800 hover:bg-white"
+                }`}
+              >
+                Study Health
+              </button>
+              <button
+                onClick={() => {
+                  setView("changedetection");
+                }}
+                className={`rounded-full border px-3 py-1 text-xs font-semibold shadow-sm backdrop-blur ${
+                  isDarkMode
+                    ? "border-violet-700 bg-violet-900/45 text-violet-100 hover:bg-violet-900/65"
+                    : "border-violet-200 bg-white/85 text-violet-800 hover:bg-white"
+                }`}
+              >
+                Change Detection
+              </button>
+              <button
+                onClick={() => {
+                  setView("complianceaudit");
+                }}
+                className={`rounded-full border px-3 py-1 text-xs font-semibold shadow-sm backdrop-blur ${
+                  isDarkMode
+                    ? "border-violet-700 bg-violet-900/45 text-violet-100 hover:bg-violet-900/65"
+                    : "border-violet-200 bg-white/85 text-violet-800 hover:bg-white"
+                }`}
+              >
+                Compliance & Audit
+              </button>
+              <button
+                onClick={() => {
                   if (!currentProject && projects.length > 0) {
                     setCurrentProject(projects[0]);
                   }
@@ -1600,6 +1717,60 @@ export default function App() {
             auditLogs={currentAuditLogs}
             onBackToDashboard={() => setView("dashboard")}
           />
+        )}
+
+        {view === "esource" && (
+          <Suspense fallback={<div>Loading eSource...</div>}>
+            <ESource onBack={() => setView("dashboard")} />
+          </Suspense>
+        )}
+
+        {view === "sdv" && (
+          <Suspense fallback={<div>Loading SDV...</div>}>
+            <SDV onBack={() => setView("dashboard")} />
+          </Suspense>
+        )}
+
+        {view === "medicalcoding" && (
+          <Suspense fallback={<div>Loading Medical Coding...</div>}>
+            <MedicalCoding onBack={() => setView("dashboard")} />
+          </Suspense>
+        )}
+
+        {view === "datalock" && (
+          <Suspense fallback={<div>Loading Data Lock...</div>}>
+            <DataLock onBack={() => setView("dashboard")} />
+          </Suspense>
+        )}
+
+        {view === "multisourcedata" && (
+          <Suspense fallback={<div>Loading Multi-Source Data...</div>}>
+            <MultiSourceData onBack={() => setView("dashboard")} />
+          </Suspense>
+        )}
+
+        {view === "automatedreconciliation" && (
+          <Suspense fallback={<div>Loading Automated Reconciliation...</div>}>
+            <AutomatedReconciliation onBack={() => setView("dashboard")} />
+          </Suspense>
+        )}
+
+        {view === "studyhealthdashboards" && (
+          <Suspense fallback={<div>Loading Study Health Dashboards...</div>}>
+            <StudyHealthDashboards onBack={() => setView("dashboard")} />
+          </Suspense>
+        )}
+
+        {view === "changedetection" && (
+          <Suspense fallback={<div>Loading Change Detection...</div>}>
+            <ChangeDetection onBack={() => setView("dashboard")} />
+          </Suspense>
+        )}
+
+        {view === "complianceaudit" && (
+          <Suspense fallback={<div>Loading Compliance & Audit...</div>}>
+            <ComplianceAudit onBack={() => setView("dashboard")} />
+          </Suspense>
         )}
       </main>
 
